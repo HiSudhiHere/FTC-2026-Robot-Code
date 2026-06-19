@@ -16,16 +16,22 @@ public class TurretSubsystem {
     private static final double MAX_ANGLE = 120.0;
 
     // PIDF
-    private double kP = 0.006;
+    private double kP = 0.013;
     private double kI = 0.0000;
-    private double kD = 0.0001;
-    private double kF = 0.03;
+    private double kD = 0.00001;
+    private double kF = 0.020;
 
     private double integral = 0;
     private double lastError = 0;
 
     private double lockedFieldAngle = 0;
     private double turretOffsetDeg = 0;
+
+    private double lastPosition = 0;
+    private double turretVelocity = 0;
+
+
+
 
     private final ElapsedTime pidTimer = new ElapsedTime();
 
@@ -35,6 +41,7 @@ public class TurretSubsystem {
 
         turret.setZeroPowerBehavior(
                 DcMotor.ZeroPowerBehavior.BRAKE);
+
 
         turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
@@ -66,7 +73,7 @@ public class TurretSubsystem {
                 targetTicks - currentTicks;
 
         // Deadband to prevent oscillation
-        if (Math.abs(error) < 5) {
+        if (Math.abs(error) < 8) {
             turret.setPower(0);
             integral = 0;
             lastError = error;
@@ -74,7 +81,11 @@ public class TurretSubsystem {
         }
 
         double dt = pidTimer.seconds();
+
         pidTimer.reset();
+
+        turretVelocity = (currentTicks - lastPosition) / Math.max(dt, 0.001);
+        lastPosition = currentTicks;
 
         integral += error * dt;
 
@@ -86,19 +97,44 @@ public class TurretSubsystem {
                 (error - lastError)
                         / Math.max(dt, 0.001);
 
+        derivative = Math.max(-4000, Math.min(4000, derivative));
+
         double power =
                 (kP * error)
                         + (kI * integral)
-                        + (kD * derivative);
+                        + (kD * derivative)
+                        - (0.00025 * turretVelocity);
 
-        if (Math.abs(error) > 20) {
-            power += Math.signum(error) * kF;
+        if (Math.abs(error) > 200) {
+            power += Math.signum(error) * 0.10;
+        }
+        else if (Math.abs(error) > 80) {
+            power += Math.signum(error) * 0.06;
+        }
+        else if (Math.abs(error) > 20) {
+            power += Math.signum(error) * 0.03;
         }
 
         power = Math.max(
                 -1.0,
                 Math.min(1.0, power));
 
+        double maxPower;
+
+        if (Math.abs(error) > 300) {
+            maxPower = 1.00;
+        }
+        else if (Math.abs(error) > 120) {
+            maxPower = 0.70;
+        }
+        else if (Math.abs(error) > 40) {
+            maxPower = 0.45;
+        }
+        else {
+            maxPower = 0.18;
+        }
+
+        power = Math.max(-maxPower, Math.min(maxPower, power));
         turret.setPower(power);
 
         lastError = error;

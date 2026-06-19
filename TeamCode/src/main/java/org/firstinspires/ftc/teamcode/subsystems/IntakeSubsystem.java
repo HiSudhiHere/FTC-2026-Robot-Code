@@ -20,7 +20,7 @@ public class IntakeSubsystem {
     }
 
     public void intakeOut() {
-        intake.setPower(-0.74);
+        intake.setPower(-0.8);
     }
 
     public void stop() {
@@ -34,4 +34,5 @@ public class IntakeSubsystem {
     public double getVelocity() {
         return intake.getVelocity();
     }
+
 }

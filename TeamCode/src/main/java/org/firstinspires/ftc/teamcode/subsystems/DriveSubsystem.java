@@ -1,23 +1,23 @@
 package org.firstinspires.ftc.teamcode.subsystems;
 
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
 public class DriveSubsystem {
 
-    private final DcMotor FL;
-    private final DcMotor FR;
-    private final DcMotor BL;
-    private final DcMotor BR;
+    private final DcMotorEx FL;
+    private final DcMotorEx FR;
+    private final DcMotorEx BL;
+    private final DcMotorEx BR;
 
     public DriveSubsystem(HardwareMap hardwareMap) {
 
-        FL = hardwareMap.get(DcMotor.class, "FL");
-        FR = hardwareMap.get(DcMotor.class, "FR");
-        BL = hardwareMap.get(DcMotor.class, "BL");
-        BR = hardwareMap.get(DcMotor.class, "BR");
+        FL = hardwareMap.get(DcMotorEx.class, "FL");
+        FR = hardwareMap.get(DcMotorEx.class, "FR");
+        BL = hardwareMap.get(DcMotorEx.class, "BL");
+        BR = hardwareMap.get(DcMotorEx.class, "BR");
 
-        // Your motor directions
         FL.setDirection(DcMotor.Direction.FORWARD);
         BL.setDirection(DcMotor.Direction.FORWARD);
         FR.setDirection(DcMotor.Direction.REVERSE);
@@ -27,14 +27,19 @@ public class DriveSubsystem {
         FR.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         BL.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         BR.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+
+        FL.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        FR.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        BL.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        BR.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
     }
 
-    public void drive(double drive, double strafe, double turn) {
+    public void drive(double forward, double strafe, double turn) {
 
-        double fl = drive + strafe + turn;
-        double fr = drive - strafe - turn;
-        double bl = drive - strafe + turn;
-        double br = drive + strafe - turn;
+        double fl = forward + strafe + turn;
+        double fr = forward - strafe - turn;
+        double bl = forward - strafe + turn;
+        double br = forward + strafe - turn;
 
         double max = Math.max(
                 Math.max(Math.abs(fl), Math.abs(fr)),

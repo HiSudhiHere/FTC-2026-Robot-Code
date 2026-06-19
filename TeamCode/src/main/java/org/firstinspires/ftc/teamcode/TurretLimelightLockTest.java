@@ -8,6 +8,10 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 
 import org.firstinspires.ftc.teamcode.subsystems.DriveSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.ShooterSubsystem;
@@ -24,6 +28,8 @@ public class TurretLimelightLockTest extends LinearOpMode {
     private Limelight3A limelight;
     private ServoSubsystem servos;
 
+    private GoBildaPinpointDriver pinpoint;
+
     private Servo hooder;
 
 
@@ -33,11 +39,11 @@ public class TurretLimelightLockTest extends LinearOpMode {
     private static final double STOPPER_OPEN = 0.6;
     private static final double DRIVE_SPEED = 0.9;
     private static final double STOPPER_CLOSED = 0.3;
-    private static final double KP = 0.018;
-    private static final double MIN_POWER = 0.08;
-    private static final double MAX_POWER = 0.08;
-    private static final double DEADZONE = 0.20;
-
+    private double filteredTx = 0;
+    private static final double KP = 0.015;
+    private static final double MIN_POWER = 0.07;
+    private static final double MAX_POWER = 0.3;
+    private static final double DEADZONE = 1.9;
     @Override
     public void runOpMode() {
 
@@ -45,6 +51,18 @@ public class TurretLimelightLockTest extends LinearOpMode {
         shooter = new ShooterSubsystem(hardwareMap);
         intake = new IntakeSubsystem(hardwareMap);
         servos = new ServoSubsystem(hardwareMap);
+        pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
+
+// Select the pod type
+        pinpoint.setEncoderResolution(
+                GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
+
+// Set encoder directions (change if necessary)
+        pinpoint.setEncoderDirections(
+                GoBildaPinpointDriver.EncoderDirection.FORWARD,
+                GoBildaPinpointDriver.EncoderDirection.FORWARD);
+
+        pinpoint.resetPosAndIMU();
 
 
         turret = hardwareMap.get(DcMotorEx.class, "turret");
@@ -63,6 +81,13 @@ public class TurretLimelightLockTest extends LinearOpMode {
 
         while (opModeIsActive()) {
 
+            pinpoint.update();
+
+            Pose2D pose = pinpoint.getPosition();
+
+            double robotX = pose.getX(DistanceUnit.INCH);
+            double robotY = pose.getY(DistanceUnit.INCH);
+            double heading = pose.getHeading(AngleUnit.DEGREES);
             // Drive
             drive.drive(
                     -gamepad1.left_stick_y * DRIVE_SPEED,
@@ -98,11 +123,11 @@ public class TurretLimelightLockTest extends LinearOpMode {
             // HOODER SERVO CONTROL
             // =========================
             if (gamepad1.a) {
-                servos.setHudder(0.5);
+                servos.setHudder(0.70);
             }
 
             if (gamepad1.b) {
-                servos.setHudder(0.0);
+                servos.setHudder(0.22);
             }
 
             // =========================
@@ -131,15 +156,24 @@ public class TurretLimelightLockTest extends LinearOpMode {
 
             if (result != null && result.isValid()) {
 
+
                 double tx = result.getTx();
+
+                double x = result.getBotpose().getPosition().x;
+                double y = result.getBotpose().getPosition().y;
+
+                double distance = Math.hypot(x, y);
+
+                // Smooth TX
+                filteredTx = filteredTx * 0.70 + tx * 0.30;
 
                 double turretPower = 0;
 
-                if (Math.abs(tx) > DEADZONE) {
+                // Larger lock zone to prevent hunting
+                if (Math.abs(filteredTx) > DEADZONE) {
 
-                    turretPower = -tx * KP;
+                    turretPower = -filteredTx * KP;
 
-                    // overcome friction
                     if (Math.abs(turretPower) < MIN_POWER) {
                         turretPower = Math.signum(turretPower) * MIN_POWER;
                     }
@@ -153,7 +187,8 @@ public class TurretLimelightLockTest extends LinearOpMode {
                 turret.setPower(turretPower);
 
                 telemetry.addData("Tag Visible", true);
-                telemetry.addData("TX", tx);
+                telemetry.addData("TX Raw", tx);
+                telemetry.addData("TX Filtered", filteredTx);
                 telemetry.addData("Turret Power", turretPower);
 
             } else {
@@ -182,7 +217,12 @@ public class TurretLimelightLockTest extends LinearOpMode {
 
             telemetry.addData("Right Velocity",
                     "%.1f", shooter.getRightVelocity());
+            telemetry.addData("Servo position", "%.2f", servos.getHudderPosition());
 
+            telemetry.addLine("===== PINPOINT =====");
+            telemetry.addData("X (in)", "%.1f", robotX);
+            telemetry.addData("Y (in)", "%.1f", robotY);
+            telemetry.addData("Heading", "%.1f", heading);
 
 
 
