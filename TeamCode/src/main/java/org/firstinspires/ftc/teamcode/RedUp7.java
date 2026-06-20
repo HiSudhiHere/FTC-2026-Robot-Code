@@ -9,7 +9,6 @@ import com.bylazar.telemetry.TelemetryManager;
 import com.bylazar.telemetry.PanelsTelemetry;
 
 import com.pedropathing.Constants;
-import com.pedropathing.geometry.BezierCurve;
 import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.paths.PathChain;
@@ -28,49 +27,45 @@ public class RedUp7 extends OpMode {
     public Follower follower;
     private int pathState = 0;
     private Paths paths;
-
     private ShooterSubsystem shooter;
     private IntakeSubsystem intake;
     private ServoSubsystem servos;
     private TurretSubsystem turret;
-    private static double  value = 4;
 
     private ElapsedTime waitTimer = new ElapsedTime();
 
     private static final double STOPPER_OPEN = 0.6;
     private static final double STOPPER_CLOSED = 0.3;
 
-    private static final double SHOOT_TIME = 1000;
-    private static final double SHOOT_VELOCITY_READY = 1300;
-    private static final double MAX_WAIT_FOR_SHOOTER = 1500;
-    private static final double INTAKE_OPEN_WAIT = 1000;
-
-    private boolean shootingStarted = false;
+    private static final double SHOOT_TIME =900;
+    private static final double OPEN_WAIT_TIME = 1000;
+    private static final double INTAKE_WAIT_TIME = 1000;
 
     @Override
     public void init() {
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
         follower = Constants.createFollower(hardwareMap);
-        follower.setStartingPose(new Pose(110, 133, Math.toRadians(270)));
+        follower.setStartingPose(new Pose(110, 131, Math.toRadians(90)));
+        follower.setMaxPower(0.90);
 
         shooter = new ShooterSubsystem(hardwareMap);
         intake = new IntakeSubsystem(hardwareMap);
         servos = new ServoSubsystem(hardwareMap);
-
         turret = new TurretSubsystem(hardwareMap);
+
         turret.setFieldAngle(0);
-        turret.setOffset(0);
+        turret.setOffset(40);
 
         servos.setStopper(STOPPER_CLOSED);
-        servos.setHudder(0.25);
+        servos.setHudder(0.12);
 
         paths = new Paths(follower);
 
+        panelsTelemetry.debug("Status", "Initialized");
+        panelsTelemetry.update(telemetry );
         follower.setMaxPower(0.95);
 
-        panelsTelemetry.debug("Status", "Initialized");
-        panelsTelemetry.update(telemetry);
     }
 
     @Override
@@ -83,63 +78,37 @@ public class RedUp7 extends OpMode {
         telemetry.addData("X", "%.2f", follower.getPose().getX());
         telemetry.addData("Y", "%.2f", follower.getPose().getY());
         telemetry.addData("Heading Deg", "%.2f", Math.toDegrees(follower.getPose().getHeading()));
-
-        telemetry.addLine("===== SHOOTER =====");
-        telemetry.addData("Left Velocity", "%.1f", shooter.getLeftVelocity());
-        telemetry.addData("Right Velocity", "%.1f", shooter.getRightVelocity());
         telemetry.addData("Average Velocity", "%.1f", shooter.getAverageVelocity());
-        telemetry.addData("Shooting Started", shootingStarted);
-
-        telemetry.addLine("===== TURRET =====");
         telemetry.addData("Turret Position", turret.getPosition());
-        telemetry.addData("Turret Field Lock", "%.1f", turret.getLockedFieldAngle());
-
         telemetry.update();
 
         panelsTelemetry.debug("Path State", pathState);
         panelsTelemetry.debug("X", follower.getPose().getX());
         panelsTelemetry.debug("Y", follower.getPose().getY());
         panelsTelemetry.debug("Heading", follower.getPose().getHeading());
-        panelsTelemetry.debug("Turret Position", turret.getPosition());
-        panelsTelemetry.debug("Turret Field Lock", turret.getLockedFieldAngle());
         panelsTelemetry.update(telemetry);
     }
 
     private void startShootPath(PathChain path, int nextState) {
-        shooter.shootFast();
-        servos.setStopper(STOPPER_CLOSED);
+        shooter.shootSlow();
         intake.stop();
-        shootingStarted = false;
+        servos.setStopper(STOPPER_CLOSED);
 
         follower.followPath(path);
         pathState = nextState;
     }
 
     private void runShootSequence(int nextState) {
-        shooter.shootFast();
-
-        if (!shootingStarted) {
-            servos.setStopper(STOPPER_CLOSED);
-            intake.stop();
-
-            if (shooter.getAverageVelocity() > SHOOT_VELOCITY_READY
-                    || waitTimer.milliseconds() > MAX_WAIT_FOR_SHOOTER) {
-                shootingStarted = true;
-                waitTimer.reset();
-            }
-
-            return;
-        }
-
+        shooter.shootSlow();
         servos.setStopper(STOPPER_OPEN);
+
+        // If this is physically opposite, change intakeOut() to intakeIn()
         intake.intakeOut();
 
         if (waitTimer.milliseconds() >= SHOOT_TIME) {
             servos.setStopper(STOPPER_CLOSED);
             intake.stop();
             shooter.stop();
-
-            shootingStarted = false;
             pathState = nextState;
         }
     }
@@ -147,19 +116,49 @@ public class RedUp7 extends OpMode {
     private void startIntakePath(PathChain path, int nextState) {
         shooter.stop();
         servos.setStopper(STOPPER_CLOSED);
+
+        // If this is physically opposite, change intakeOut() to intakeIn()
         intake.intakeOut();
 
         follower.followPath(path);
         pathState = nextState;
     }
 
-    private void runIntakeOpenWait(int nextState) {
+    private void startOpenPath(PathChain path, int nextState) {
+        shooter.stop();
+        intake.stop();
+        servos.setStopper(STOPPER_CLOSED);
+
+        follower.followPath(path);
+        pathState = nextState;
+    }
+
+    private void startPathToIntake(PathChain path, int nextState) {
+        shooter.stop();
+        intake.stop();
+        servos.setStopper(STOPPER_CLOSED);
+
+        follower.followPath(path);
+        pathState = nextState;
+    }
+
+    private void waitWithIntakeOn(int nextState) {
         shooter.stop();
         servos.setStopper(STOPPER_CLOSED);
         intake.intakeOut();
 
-        if (waitTimer.milliseconds() >= INTAKE_OPEN_WAIT) {
+        if (waitTimer.milliseconds() >= INTAKE_WAIT_TIME) {
             intake.stop();
+            pathState = nextState;
+        }
+    }
+
+    private void waitWithIntakeOff(int nextState) {
+        shooter.stop();
+        intake.stop();
+        servos.setStopper(STOPPER_CLOSED);
+
+        if (waitTimer.milliseconds() >= OPEN_WAIT_TIME) {
             pathState = nextState;
         }
     }
@@ -168,14 +167,12 @@ public class RedUp7 extends OpMode {
         switch (pathState) {
 
             case 0:
-                follower.setMaxPower(0.95);
                 startShootPath(paths.shoot1, 1);
                 break;
 
             case 1:
                 if (!follower.isBusy()) {
                     waitTimer.reset();
-                    shootingStarted = false;
                     pathState = 2;
                 }
                 break;
@@ -185,102 +182,100 @@ public class RedUp7 extends OpMode {
                 break;
 
             case 3:
-                follower.setMaxPower(0.80);
                 startIntakePath(paths.intake1, 4);
                 break;
 
-            case 4:
+            /**case 4:
                 if (!follower.isBusy()) {
-                    waitTimer.reset();
-                    pathState = 5;
+                    startOpenPath(paths.open1, 5);
                 }
                 break;
 
             case 5:
-                runIntakeOpenWait(6);
+                if (!follower.isBusy()) {
+                    waitTimer.reset();
+                    pathState = 6;
+                }
                 break;
 
             case 6:
-                follower.setMaxPower(0.95);
-                startShootPath(paths.shoot2, 7);
+                waitWithIntakeOff(7);
                 break;
 
             case 7:
-                if (!follower.isBusy()) {
-                    waitTimer.reset();
-                    shootingStarted = false;
-                    pathState = 8;
-                }
+                startShootPath(paths.shoot2, 8);
                 break;
 
             case 8:
-                runShootSequence(9);
+                if (!follower.isBusy()) {
+                    waitTimer.reset();
+                    pathState = 9;
+                }
                 break;
 
             case 9:
-                startIntakePath(paths.intakeopen1, 10);
+                runShootSequence(10);
                 break;
 
             case 10:
-                if (!follower.isBusy()) {
-                    waitTimer.reset();
-                    pathState = 11;
-                }
+                startIntakePath(paths.intake2, 11);
                 break;
 
             case 11:
-                runIntakeOpenWait(12);
+                if (!follower.isBusy()) {
+                    startOpenPath(paths.open2, 12);
+                }
                 break;
 
             case 12:
-                startShootPath(paths.shoot3, 13);
+                if (!follower.isBusy()) {
+                    waitTimer.reset();
+                    pathState = 13;
+                }
                 break;
 
             case 13:
-                if (!follower.isBusy()) {
-                    waitTimer.reset();
-                    shootingStarted = false;
-                    pathState = 14;
-                }
+                waitWithIntakeOff(14);
                 break;
 
             case 14:
-                runShootSequence(15);
+                startShootPath(paths.shoot3, 15);
                 break;
 
             case 15:
-                startIntakePath(paths.intakeopen2, 16);
-                break;
-
-            case 16:
                 if (!follower.isBusy()) {
                     waitTimer.reset();
-                    pathState = 17;
+                    pathState = 16;
                 }
                 break;
 
+            case 16:
+                runShootSequence(17);
+                break;
+
             case 17:
-                runIntakeOpenWait(18);
+                startPathToIntake(paths.pathTOintake1, 18);
                 break;
 
             case 18:
-                startShootPath(paths.shoot4, 19);
+                if (!follower.isBusy()) {
+                    startIntakePath(paths.intake3, 19);
+                }
                 break;
 
             case 19:
                 if (!follower.isBusy()) {
                     waitTimer.reset();
-                    shootingStarted = false;
                     pathState = 20;
                 }
                 break;
 
             case 20:
-                runShootSequence(21);
+                waitWithIntakeOn(21);
                 break;
 
             case 21:
-                startIntakePath(paths.intakeopen3, 22);
+                startShootPath(paths.shoot4, 22);
                 break;
 
             case 22:
@@ -291,234 +286,309 @@ public class RedUp7 extends OpMode {
                 break;
 
             case 23:
-                runIntakeOpenWait(24);
+                runShootSequence(24);
                 break;
 
             case 24:
-                startShootPath(paths.shoot5, 25);
+                startPathToIntake(paths.pathTOintake2, 25);
                 break;
 
             case 25:
                 if (!follower.isBusy()) {
-                    waitTimer.reset();
-                    shootingStarted = false;
-                    pathState = 26;
+                    startIntakePath(paths.intake4, 26);
                 }
                 break;
 
             case 26:
-                runShootSequence(27);
+                if (!follower.isBusy()) {
+                    waitTimer.reset();
+                    pathState = 27;
+                }
                 break;
 
             case 27:
-                startIntakePath(paths.intakeopen4, 28);
+                waitWithIntakeOn(28);
                 break;
 
             case 28:
-                if (!follower.isBusy()) {
-                    waitTimer.reset();
-                    pathState = 29;
-                }
+                startShootPath(paths.shoot5, 29);
                 break;
 
             case 29:
-                runIntakeOpenWait(30);
+                if (!follower.isBusy()) {
+                    waitTimer.reset();
+                    pathState = 30;
+                }
                 break;
 
             case 30:
-                startShootPath(paths.shoot6, 31);
+                runShootSequence(31);
                 break;
 
             case 31:
-                if (!follower.isBusy()) {
-                    waitTimer.reset();
-                    shootingStarted = false;
-                    pathState = 32;
-                }
+                startPathToIntake(paths.pathTOintake3, 32);
                 break;
 
             case 32:
-                runShootSequence(33);
+                if (!follower.isBusy()) {
+                    startIntakePath(paths.intake5, 33);
+                }
                 break;
 
             case 33:
-                startIntakePath(paths.intakeopen5, 34);
+                if (!follower.isBusy()) {
+                    waitTimer.reset();
+                    pathState = 34;
+                }
                 break;
 
             case 34:
-                if (!follower.isBusy()) {
-                    waitTimer.reset();
-                    pathState = 35;
-                }
+                waitWithIntakeOn(35);
                 break;
 
             case 35:
-                runIntakeOpenWait(36);
+                startShootPath(paths.shoot6, 36);
                 break;
 
             case 36:
-                startShootPath(paths.shoot7, 37);
-                break;
-
-            case 37:
                 if (!follower.isBusy()) {
                     waitTimer.reset();
-                    shootingStarted = false;
-                    pathState = 38;
+                    pathState = 37;
                 }
                 break;
 
+            case 37:
+                runShootSequence(38);
+                break;
+
             case 38:
-                runShootSequence(39);
+                startPathToIntake(paths.pathTOintake4, 39);
                 break;
 
             case 39:
+                if (!follower.isBusy()) {
+                    startIntakePath(paths.intake6, 40);
+                }
+                break;
+
+            case 40:
+                if (!follower.isBusy()) {
+                    waitTimer.reset();
+                    pathState = 41;
+                }
+                break;
+
+            case 41:
+                waitWithIntakeOn(42);
+                break;
+
+            case 42:
+                startShootPath(paths.shoot7, 43);
+                break;
+
+            case 43:
+                if (!follower.isBusy()) {
+                    waitTimer.reset();
+                    pathState = 44;
+                }
+                break;
+
+            case 44:
+                runShootSequence(45);
+                break;
+
+            case 45:
                 intake.stop();
                 shooter.stop();
                 turret.stop();
                 servos.setStopper(STOPPER_CLOSED);
-                break;
+                break;**/
         }
     }
 
     public static class Paths {
         public PathChain shoot1;
         public PathChain intake1;
+/**        public PathChain open1;
         public PathChain shoot2;
-        public PathChain intakeopen1;
+        public PathChain intake2;
+        public PathChain open2;
         public PathChain shoot3;
-        public PathChain intakeopen2;
+        public PathChain pathTOintake1;
+        public PathChain intake3;
         public PathChain shoot4;
-        public PathChain intakeopen3;
+        public PathChain pathTOintake2;
+        public PathChain intake4;
         public PathChain shoot5;
-        public PathChain intakeopen4;
+        public PathChain pathTOintake3;
+        public PathChain intake5;
         public PathChain shoot6;
-        public PathChain intakeopen5;
-        public PathChain shoot7;
+        public PathChain pathTOintake4;
+        public PathChain intake6;
+        public PathChain shoot7;**/
 
         public Paths(Follower follower) {
 
             shoot1 = follower.pathBuilder()
                     .addPath(new BezierLine(
-                            new Pose(110.000, 133.000),
-                            new Pose(93.000, 92.000)
+                            new Pose(110.000, 131.000),
+                            new Pose(83.000, 82.000)
                     ))
-                    .setLinearHeadingInterpolation(Math.toRadians(270), Math.toRadians(0))
+                    .setLinearHeadingInterpolation(Math.toRadians(90), Math.toRadians(0))
                     .build();
 
             intake1 = follower.pathBuilder()
+                    .addPath(new BezierLine(
+                            new Pose(83.000, 82.000),
+                            new Pose(126.000, 82.000)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(5), Math.toRadians(0))
+                    .build();
+
+/**            open1 = follower.pathBuilder()
                     .addPath(new BezierCurve(
-                            new Pose(93.000, 92.000),
-                            new Pose(77.000, 49.000),
-                            new Pose(126.000-value, 59.500)
+                            new Pose(126.000, 82.000),
+                            new Pose(120.000, 78.000),
+                            new Pose(126.000, 74.000)
                     ))
                     .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(0))
                     .build();
 
             shoot2 = follower.pathBuilder()
-                    .addPath(new BezierCurve(
-                            new Pose(126.000-value, 59.500),
-                            new Pose(88.000, 31.000),
-                            new Pose(81.000, 79.000)
+                    .addPath(new BezierLine(
+                            new Pose(126.000, 74.000),
+                            new Pose(84.000, 82.000)
                     ))
-                    .setTangentHeadingInterpolation()
-                    .setReversed()
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(-60))
                     .build();
 
-            intakeopen1 = follower.pathBuilder()
+            intake2 = follower.pathBuilder()
                     .addPath(new BezierCurve(
-                            new Pose(81.000, 79.000),
-                            new Pose(88.000, 31.000),
-                            new Pose(130.000-value, 57.000)
+                            new Pose(84.000, 82.000),
+                            new Pose(84.000, 56.000),
+                            new Pose(126.000, 58.000)
                     ))
-                    .setTangentHeadingInterpolation()
+                    .setLinearHeadingInterpolation(Math.toRadians(-60), Math.toRadians(0))
+                    .build();
+
+            open2 = follower.pathBuilder()
+                    .addPath(new BezierCurve(
+                            new Pose(126.000, 58.000),
+                            new Pose(121.000, 61.000),
+                            new Pose(126.000, 63.000)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(0))
                     .build();
 
             shoot3 = follower.pathBuilder()
-                    .addPath(new BezierCurve(
-                            new Pose(130.000-value, 57.000),
-                            new Pose(88.000, 58.000),
-                            new Pose(81.000, 79.000)
+                    .addPath(new BezierLine(
+                            new Pose(126.000, 63.000),
+                            new Pose(84.000, 82.000)
                     ))
-                    .setTangentHeadingInterpolation()
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(-40))
                     .setReversed()
                     .build();
 
-            intakeopen2 = follower.pathBuilder()
+            pathTOintake1 = follower.pathBuilder()
                     .addPath(new BezierCurve(
-                            new Pose(81.000, 79.000),
-                            new Pose(88.000, 31.000),
-                            new Pose(130.000-value, 57.000)
+                            new Pose(84.000, 82.000),
+                            new Pose(98.000, 64.000),
+                            new Pose(123.000, 64.000)
                     ))
-                    .setTangentHeadingInterpolation()
+                    .setLinearHeadingInterpolation(Math.toRadians(-40), Math.toRadians(0))
+                    .build();
+
+            intake3 = follower.pathBuilder()
+                    .addPath(new BezierLine(
+                            new Pose(123.000, 64.000),
+                            new Pose(128.000, 56.000)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(35))
                     .build();
 
             shoot4 = follower.pathBuilder()
                     .addPath(new BezierCurve(
-                            new Pose(130.000-value, 57.000),
-                            new Pose(88.000, 58.000),
-                            new Pose(81.000, 79.000)
+                            new Pose(128.000, 56.000),
+                            new Pose(92.812, 64.500),
+                            new Pose(84.000, 82.000)
                     ))
-                    .setTangentHeadingInterpolation()
-                    .setReversed()
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(-40))
                     .build();
 
-            intakeopen3 = follower.pathBuilder()
+            pathTOintake2 = follower.pathBuilder()
                     .addPath(new BezierCurve(
-                            new Pose(81.000, 79.000),
-                            new Pose(88.000, 31.000),
-                            new Pose(130.000-value, 57.000)
+                            new Pose(84.000, 82.000),
+                            new Pose(98.000, 64.000),
+                            new Pose(123.000, 64.000)
                     ))
-                    .setTangentHeadingInterpolation()
+                    .setLinearHeadingInterpolation(Math.toRadians(-40), Math.toRadians(0))
+                    .build();
+
+            intake4 = follower.pathBuilder()
+                    .addPath(new BezierLine(
+                            new Pose(123.000, 64.000),
+                            new Pose(128.000, 56.000)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(35))
                     .build();
 
             shoot5 = follower.pathBuilder()
-                    .addPath(new BezierCurve(
-                            new Pose(130.000-value, 57.000),
-                            new Pose(88.000, 58.000),
-                            new Pose(81.000, 79.000)
+                    .addPath(new BezierLine(
+                            new Pose(128.000, 56.000),
+                            new Pose(84.000, 82.000)
                     ))
-                    .setTangentHeadingInterpolation()
-                    .setReversed()
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(-40))
                     .build();
 
-            intakeopen4 = follower.pathBuilder()
+            pathTOintake3 = follower.pathBuilder()
                     .addPath(new BezierCurve(
-                            new Pose(81.000, 79.000),
-                            new Pose(88.000, 31.000),
-                            new Pose(130.000-value, 57.000)
+                            new Pose(84.000, 82.000),
+                            new Pose(98.000, 64.000),
+                            new Pose(123.000, 64.000)
                     ))
-                    .setTangentHeadingInterpolation()
+                    .setLinearHeadingInterpolation(Math.toRadians(-40), Math.toRadians(0))
+                    .build();
+
+            intake5 = follower.pathBuilder()
+                    .addPath(new BezierLine(
+                            new Pose(123.000, 64.000),
+                            new Pose(128.000, 56.000)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(35))
                     .build();
 
             shoot6 = follower.pathBuilder()
-                    .addPath(new BezierCurve(
-                            new Pose(130.000-value, 57.000),
-                            new Pose(88.000, 58.000),
-                            new Pose(81.000, 79.000)
+                    .addPath(new BezierLine(
+                            new Pose(128.000, 56.000),
+                            new Pose(84.000, 82.000)
                     ))
-                    .setTangentHeadingInterpolation()
-                    .setReversed()
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(-40))
                     .build();
 
-            intakeopen5 = follower.pathBuilder()
+            pathTOintake4 = follower.pathBuilder()
                     .addPath(new BezierCurve(
-                            new Pose(81.000, 79.000),
-                            new Pose(88.000, 31.000),
-                            new Pose(130.000-value, 57.000)
+                            new Pose(84.000, 82.000),
+                            new Pose(98.000, 64.000),
+                            new Pose(123.000, 64.000)
                     ))
-                    .setTangentHeadingInterpolation()
+                    .setLinearHeadingInterpolation(Math.toRadians(-40), Math.toRadians(0))
+                    .build();
+
+            intake6 = follower.pathBuilder()
+                    .addPath(new BezierLine(
+                            new Pose(123.000, 64.000),
+                            new Pose(128.000, 56.000)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(35))
                     .build();
 
             shoot7 = follower.pathBuilder()
-                    .addPath(new BezierCurve(
-                            new Pose(130.000-value, 57.000),
-                            new Pose(88.000, 58.000),
-                            new Pose(81.000, 79.000)
+                    .addPath(new BezierLine(
+                            new Pose(128.000, 56.000),
+                            new Pose(84.000, 82.000)
                     ))
-                    .setTangentHeadingInterpolation()
-                    .setReversed()
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(-40))
                     .build();
-        }
+        **/}
     }
 }

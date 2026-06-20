@@ -22,7 +22,7 @@ import org.firstinspires.ftc.teamcode.subsystems.TurretSubsystem;
 
 @Autonomous(name = "RedDown8", group = "Autonomous")
 @Configurable
-public class RedDown8 extends OpMode {
+public class RedDown8Test2 extends OpMode {
 
     private TelemetryManager panelsTelemetry;
     public Follower follower;
@@ -39,12 +39,25 @@ public class RedDown8 extends OpMode {
     private static final double STOPPER_OPEN = 0.6;
     private static final double STOPPER_CLOSED = 0.3;
 
-    private static final double SHOOT_TIME = 700;
-    private static final double SHOOT_VELOCITY_READY = 1500;
+    /*
+     * Because this class is @Configurable, keep these public/non-final so you can tune them live.
+     *
+     * TARGET_SHOOTER_VELOCITY must match the velocity your ShooterSubsystem is actually commanding
+     * inside shooter.shootFast(). If the ball that scored was around 1260, test 1260 as the target
+     * in ShooterSubsystem too; do not only change this gate.
+     */
+    public static double SHOOT_TIME = 500;              // counts only the time when stopper is OPEN
+    public static double TARGET_SHOOTER_VELOCITY = 1600;
+    public static double VELOCITY_UNDER_TOLERANCE = 100; // stopper closes below target - this
+    public static double VELOCITY_OVER_TOLERANCE = 75;  // stopper closes above target + this
+    public static double MAX_SHOOT_SEQUENCE_TIME = 2500;
 
     private static int value = 3;
 
     private boolean shootingStarted = false;
+    private boolean shooterVelocityInRange = false;
+    private double openFeedTimeMs = 0;
+    private double lastShootLoopMs = 0;
 
     @Override
     public void init() {
@@ -87,6 +100,9 @@ public class RedDown8 extends OpMode {
         telemetry.addData("Left Velocity", "%.1f", shooter.getLeftVelocity());
         telemetry.addData("Right Velocity", "%.1f", shooter.getRightVelocity());
         telemetry.addData("Average Velocity", "%.1f", shooter.getAverageVelocity());
+        telemetry.addData("Target Velocity", "%.1f", TARGET_SHOOTER_VELOCITY);
+        telemetry.addData("Velocity In Range", shooterVelocityInRange);
+        telemetry.addData("Open Feed Time ms", "%.0f", openFeedTimeMs);
         telemetry.addData("Shooting Started", shootingStarted);
 
         telemetry.addLine("===== TURRET =====");
@@ -103,11 +119,35 @@ public class RedDown8 extends OpMode {
     }
 
 
+    private void resetShootSequence() {
+        shootingStarted = false;
+        shooterVelocityInRange = false;
+        openFeedTimeMs = 0;
+        lastShootLoopMs = 0;
+        waitTimer.reset();
+    }
+
+    private boolean isShooterVelocityInRange() {
+        double velocity = shooter.getAverageVelocity();
+        double minVelocity = TARGET_SHOOTER_VELOCITY - VELOCITY_UNDER_TOLERANCE;
+        double maxVelocity = TARGET_SHOOTER_VELOCITY + VELOCITY_OVER_TOLERANCE;
+
+        return velocity >= minVelocity && velocity <= maxVelocity;
+    }
+
+    private void finishShootSequence(int nextState) {
+        servos.setStopper(STOPPER_CLOSED);
+        intake.stop();
+        shooter.stop();
+        resetShootSequence();
+        pathState = nextState;
+    }
+
     private void startShootPath(PathChain path, int nextState) {
         shooter.shootFast();
         servos.setStopper(STOPPER_CLOSED);
         intake.stop();
-        shootingStarted = false;
+        resetShootSequence();
 
         follower.followPath(path);
         pathState = nextState;
@@ -117,27 +157,29 @@ public class RedDown8 extends OpMode {
         shooter.shootFast();
 
         if (!shootingStarted) {
-            servos.setStopper(STOPPER_CLOSED);
-            intake.stop();
-
-            if (shooter.getAverageVelocity() > SHOOT_VELOCITY_READY) {
-                shootingStarted = true;
-                waitTimer.reset();
-            }
-
-            return;
+            shootingStarted = true;
+            openFeedTimeMs = 0;
+            lastShootLoopMs = 0;
+            waitTimer.reset();
         }
 
-        servos.setStopper(STOPPER_OPEN);
-        intake.intakeOut();
+        double nowMs = waitTimer.milliseconds();
+        double deltaMs = nowMs - lastShootLoopMs;
+        lastShootLoopMs = nowMs;
 
-        if (waitTimer.milliseconds() >= SHOOT_TIME) {
+        shooterVelocityInRange = isShooterVelocityInRange();
+
+        if (shooterVelocityInRange) {
+            servos.setStopper(STOPPER_OPEN);
+            intake.intakeOut();
+            openFeedTimeMs += Math.max(0, deltaMs);
+        } else {
             servos.setStopper(STOPPER_CLOSED);
             intake.stop();
-            shooter.stop();
+        }
 
-            shootingStarted = false;
-            pathState = nextState;
+        if (openFeedTimeMs >= SHOOT_TIME || nowMs >= MAX_SHOOT_SEQUENCE_TIME) {
+            finishShootSequence(nextState);
         }
     }
 
@@ -169,7 +211,7 @@ public class RedDown8 extends OpMode {
 
             case 1:
                 if (!follower.isBusy()) {
-                    shootingStarted = false;
+                    resetShootSequence();
                     pathState = 2;
                 }
                 break;
@@ -197,7 +239,7 @@ public class RedDown8 extends OpMode {
 
             case 6:
                 if (!follower.isBusy()) {
-                    shootingStarted = false;
+                    resetShootSequence();
                     pathState = 7;
                 }
                 break;
@@ -219,7 +261,7 @@ public class RedDown8 extends OpMode {
 
             case 10:
                 if (!follower.isBusy()) {
-                    shootingStarted = false;
+                    resetShootSequence();
                     pathState = 11;
                 }
                 break;
@@ -241,7 +283,7 @@ public class RedDown8 extends OpMode {
 
             case 14:
                 if (!follower.isBusy()) {
-                    shootingStarted = false;
+                    resetShootSequence();
                     pathState = 15;
                 }
                 break;
@@ -263,7 +305,7 @@ public class RedDown8 extends OpMode {
 
             case 18:
                 if (!follower.isBusy()) {
-                    shootingStarted = false;
+                    resetShootSequence();
                     pathState = 19;
                 }
                 break;
@@ -285,7 +327,7 @@ public class RedDown8 extends OpMode {
 
             case 22:
                 if (!follower.isBusy()) {
-                    shootingStarted = false;
+                    resetShootSequence();
                     pathState = 23;
                 }
                 break;
@@ -307,7 +349,7 @@ public class RedDown8 extends OpMode {
 
             case 26:
                 if (!follower.isBusy()) {
-                    shootingStarted = false;
+                    resetShootSequence();
                     pathState = 27;
                 }
                 break;
@@ -329,7 +371,7 @@ public class RedDown8 extends OpMode {
 
             case 30:
                 if (!follower.isBusy()) {
-                    shootingStarted = false;
+                    resetShootSequence();
                     pathState = 31;
                 }
                 break;

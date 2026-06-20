@@ -17,7 +17,7 @@ public class ServoTest extends LinearOpMode {
 
         telemetry.addLine("Servo Test Ready");
         telemetry.addLine("A = Position 0.0");
-        telemetry.addLine("B = Position 0.3");
+        telemetry.addLine("B = Position 0.5");
         telemetry.addLine("Y = Position 1.0");
         telemetry.update();
 
