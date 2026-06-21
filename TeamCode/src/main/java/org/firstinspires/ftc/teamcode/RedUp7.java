@@ -1,8 +1,11 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.pedropathing.geometry.BezierCurve;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.hardware.limelightvision.Limelight3A;
 
 import com.bylazar.configurables.annotations.Configurable;
 import com.bylazar.telemetry.TelemetryManager;
@@ -14,10 +17,12 @@ import com.pedropathing.follower.Follower;
 import com.pedropathing.paths.PathChain;
 import com.pedropathing.geometry.Pose;
 
+
 import org.firstinspires.ftc.teamcode.subsystems.IntakeSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.ServoSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.ShooterSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.TurretSubsystem;
+
 
 @Autonomous(name = "RedUp7", group = "Autonomous")
 @Configurable
@@ -31,15 +36,14 @@ public class RedUp7 extends OpMode {
     private IntakeSubsystem intake;
     private ServoSubsystem servos;
     private TurretSubsystem turret;
-
+    private Limelight3A limelight;
     private ElapsedTime waitTimer = new ElapsedTime();
-
+    private static int value = 2;
     private static final double STOPPER_OPEN = 0.6;
     private static final double STOPPER_CLOSED = 0.3;
-
     private static final double SHOOT_TIME =900;
-    private static final double OPEN_WAIT_TIME = 1000;
-    private static final double INTAKE_WAIT_TIME = 1000;
+    //private static final double OPEN_WAIT_TIME = 1000;
+    private static final double INTAKE_WAIT_TIME = 800;
 
     @Override
     public void init() {
@@ -52,10 +56,13 @@ public class RedUp7 extends OpMode {
         shooter = new ShooterSubsystem(hardwareMap);
         intake = new IntakeSubsystem(hardwareMap);
         servos = new ServoSubsystem(hardwareMap);
-        turret = new TurretSubsystem(hardwareMap);
 
-        turret.setFieldAngle(0);
-        turret.setOffset(40);
+        turret = new TurretSubsystem(hardwareMap);
+        turret.setFieldAngle(40);
+
+        limelight = hardwareMap.get(Limelight3A.class, "limelight");
+        limelight.pipelineSwitch(1);
+        limelight.start();
 
         servos.setStopper(STOPPER_CLOSED);
         servos.setHudder(0.12);
@@ -158,7 +165,7 @@ public class RedUp7 extends OpMode {
         intake.stop();
         servos.setStopper(STOPPER_CLOSED);
 
-        if (waitTimer.milliseconds() >= OPEN_WAIT_TIME) {
+        if (waitTimer.milliseconds() >= 200) {
             pathState = nextState;
         }
     }
@@ -185,7 +192,7 @@ public class RedUp7 extends OpMode {
                 startIntakePath(paths.intake1, 4);
                 break;
 
-            /**case 4:
+            case 4:
                 if (!follower.isBusy()) {
                     startOpenPath(paths.open1, 5);
                 }
@@ -402,14 +409,14 @@ public class RedUp7 extends OpMode {
                 shooter.stop();
                 turret.stop();
                 servos.setStopper(STOPPER_CLOSED);
-                break;**/
+                break;
         }
     }
 
     public static class Paths {
         public PathChain shoot1;
         public PathChain intake1;
-/**        public PathChain open1;
+        public PathChain open1;
         public PathChain shoot2;
         public PathChain intake2;
         public PathChain open2;
@@ -425,7 +432,7 @@ public class RedUp7 extends OpMode {
         public PathChain shoot6;
         public PathChain pathTOintake4;
         public PathChain intake6;
-        public PathChain shoot7;**/
+        public PathChain shoot7;
 
         public Paths(Follower follower) {
 
@@ -440,23 +447,23 @@ public class RedUp7 extends OpMode {
             intake1 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(83.000, 82.000),
-                            new Pose(126.000, 82.000)
+                            new Pose(126.000-value, 82.000)
                     ))
                     .setLinearHeadingInterpolation(Math.toRadians(5), Math.toRadians(0))
                     .build();
 
-/**            open1 = follower.pathBuilder()
+            open1 = follower.pathBuilder()
                     .addPath(new BezierCurve(
-                            new Pose(126.000, 82.000),
-                            new Pose(120.000, 78.000),
-                            new Pose(126.000, 74.000)
+                            new Pose(126.000-value, 82.000),
+                            new Pose(120.000-value, 78.000),
+                            new Pose(126.000-value, 74.000)
                     ))
                     .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(0))
                     .build();
 
             shoot2 = follower.pathBuilder()
                     .addPath(new BezierLine(
-                            new Pose(126.000, 74.000),
+                            new Pose(126.000-value, 74.000),
                             new Pose(84.000, 82.000)
                     ))
                     .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(-60))
@@ -466,14 +473,14 @@ public class RedUp7 extends OpMode {
                     .addPath(new BezierCurve(
                             new Pose(84.000, 82.000),
                             new Pose(84.000, 56.000),
-                            new Pose(126.000, 58.000)
+                            new Pose(126.000+2, 58.000+1)
                     ))
                     .setLinearHeadingInterpolation(Math.toRadians(-60), Math.toRadians(0))
                     .build();
 
             open2 = follower.pathBuilder()
                     .addPath(new BezierCurve(
-                            new Pose(126.000, 58.000),
+                            new Pose(126.0000, 58.000),
                             new Pose(121.000, 61.000),
                             new Pose(126.000, 63.000)
                     ))
@@ -482,11 +489,10 @@ public class RedUp7 extends OpMode {
 
             shoot3 = follower.pathBuilder()
                     .addPath(new BezierLine(
-                            new Pose(126.000, 63.000),
+                            new Pose(126.000-value, 63.000),
                             new Pose(84.000, 82.000)
                     ))
                     .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(-40))
-                    .setReversed()
                     .build();
 
             pathTOintake1 = follower.pathBuilder()
@@ -501,7 +507,7 @@ public class RedUp7 extends OpMode {
             intake3 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(123.000, 64.000),
-                            new Pose(128.000, 56.000)
+                            new Pose(128.000+4, 56.000+4)
                     ))
                     .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(35))
                     .build();
@@ -527,7 +533,7 @@ public class RedUp7 extends OpMode {
             intake4 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(123.000, 64.000),
-                            new Pose(128.000, 56.000)
+                            new Pose(128.000+4, 56.000+4)
                     ))
                     .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(35))
                     .build();
@@ -552,7 +558,7 @@ public class RedUp7 extends OpMode {
             intake5 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(123.000, 64.000),
-                            new Pose(128.000, 56.000)
+                            new Pose(128.000+4, 56.000+4)
                     ))
                     .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(35))
                     .build();
@@ -577,7 +583,7 @@ public class RedUp7 extends OpMode {
             intake6 = follower.pathBuilder()
                     .addPath(new BezierLine(
                             new Pose(123.000, 64.000),
-                            new Pose(128.000, 56.000)
+                            new Pose(128.000+4, 56.000+4)
                     ))
                     .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(35))
                     .build();
@@ -589,6 +595,6 @@ public class RedUp7 extends OpMode {
                     ))
                     .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(-40))
                     .build();
-        **/}
+        }
     }
 }

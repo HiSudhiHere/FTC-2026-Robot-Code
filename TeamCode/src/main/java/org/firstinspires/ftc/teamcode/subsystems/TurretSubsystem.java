@@ -5,6 +5,8 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
+import com.qualcomm.hardware.limelightvision.Limelight3A;
+
 public class TurretSubsystem {
 
     private final DcMotorEx turret;
@@ -30,7 +32,7 @@ public class TurretSubsystem {
     private double lastPosition = 0;
     private double turretVelocity = 0;
 
-
+    private Limelight3A limelight;
 
 
     private final ElapsedTime pidTimer = new ElapsedTime();
@@ -38,6 +40,9 @@ public class TurretSubsystem {
     public TurretSubsystem(HardwareMap hardwareMap) {
 
         turret = hardwareMap.get(DcMotorEx.class, "turret");
+
+        limelight = hardwareMap.get(Limelight3A.class, "limelight");
+        limelight.start();
 
         turret.setZeroPowerBehavior(
                 DcMotor.ZeroPowerBehavior.BRAKE);

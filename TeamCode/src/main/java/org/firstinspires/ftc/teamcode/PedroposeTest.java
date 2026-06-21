@@ -3,9 +3,10 @@ package org.firstinspires.ftc.teamcode;
 import com.pedropathing.Constants;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-
+@Disabled
 @TeleOp(name = "Pedro Pose Test")
 public class PedroposeTest extends LinearOpMode {
 

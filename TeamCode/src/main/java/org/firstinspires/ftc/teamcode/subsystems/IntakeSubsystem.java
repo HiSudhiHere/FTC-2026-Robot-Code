@@ -20,7 +20,7 @@ public class IntakeSubsystem {
     }
 
     public void intakeOut() {
-        intake.setPower(-0.8);
+        intake.setPower(-0.85);
     }
 
     public void stop() {
