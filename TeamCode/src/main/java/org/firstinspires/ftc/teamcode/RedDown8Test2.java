@@ -21,7 +21,7 @@ import org.firstinspires.ftc.teamcode.subsystems.ServoSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.ShooterSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.TurretSubsystem;
 @Disabled
-@Autonomous(name = "RedDown8", group = "Autonomous")
+@Autonomous(name = "RedDown8-Test2", group = "Autonomous")
 @Configurable
 public class RedDown8Test2 extends OpMode {
 

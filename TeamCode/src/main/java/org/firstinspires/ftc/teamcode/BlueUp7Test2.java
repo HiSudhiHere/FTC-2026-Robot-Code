@@ -22,9 +22,9 @@ import org.firstinspires.ftc.teamcode.subsystems.ServoSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.ShooterSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.TurretSubsystem;
 
-@Autonomous(name = "BlueUp7", group = "Autonomous")
+@Autonomous(name = "BlueUp7Test2", group = "Autonomous")
 @Configurable
-public class BlueUp7 extends OpMode {
+public class BlueUp7Test2 extends OpMode {
 
     private TelemetryManager panelsTelemetry;
     public Follower follower;
@@ -36,7 +36,7 @@ public class BlueUp7 extends OpMode {
     private TurretSubsystem turret;
 
     private ElapsedTime waitTimer = new ElapsedTime();
-    private static int value = 5;
+    private static int value = 2;
     private static final double STOPPER_OPEN = 0.6;
     private static final double STOPPER_CLOSED = 0.3;
     private static final double SHOOT_TIME =900;
@@ -50,14 +50,14 @@ public class BlueUp7 extends OpMode {
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
         follower = Constants.createFollower(hardwareMap);
-        follower.setStartingPose(new Pose(31, 131, Math.toRadians(90)));
+        follower.setStartingPose(new Pose(107.000, 54.000, Math.toRadians(142)));
 
         shooter = new ShooterSubsystem(hardwareMap);
         intake = new IntakeSubsystem(hardwareMap);
         servos = new ServoSubsystem(hardwareMap);
 
         turret = new TurretSubsystem(hardwareMap);
-        turret.setFieldAngle(132);
+        turret.setFieldAngle(135);
 
         limelight = hardwareMap.get(Limelight3A.class, "limelight");
         limelight.pipelineSwitch(20);
@@ -70,7 +70,7 @@ public class BlueUp7 extends OpMode {
 
         panelsTelemetry.debug("Status", "Initialized");
         panelsTelemetry.update(telemetry);
-        follower.setMaxPower(0.7);
+        follower.setMaxPower(0.95);
 
     }
 
@@ -187,28 +187,28 @@ public class BlueUp7 extends OpMode {
                 runShootSequence(3);
                 break;
 
-            case 3:
-                startIntakePath(paths.intake1, 4);
-                break;
+            /**case 3:
+             startIntakePath(paths.intake1, 4);
+             break;
 
-            case 4:
-                if (!follower.isBusy()) {
-                    startOpenPath(paths.open1, 5);
-                }
-                break;
+             case 4:
+             if (!follower.isBusy()) {
+             startOpenPath(paths.open1, 5);
+             }
+             break;
 
-            case 5:
-                if (!follower.isBusy()) {
-                    waitTimer.reset();
-                    pathState = 6;
-                }
-                break;
+             case 5:
+             if (!follower.isBusy()) {
+             waitTimer.reset();
+             pathState = 6;
+             }
+             break;
 
-            case 6:
-                waitWithIntakeOff(7);
-                break;
+             case 6:
+             waitWithIntakeOff(7);
+             break;
 
-            case 7:
+             case 7:
              startShootPath(paths.shoot2, 8);
              break;
 
@@ -223,7 +223,7 @@ public class BlueUp7 extends OpMode {
              runShootSequence(10);
              break;
 
-             /**case 10:
+             case 10:
              startIntakePath(paths.intake2, 11);
              break;
 
@@ -437,18 +437,18 @@ public class BlueUp7 extends OpMode {
             shoot1 = follower.pathBuilder()
                     .addPath(
                             new BezierLine(
-                                    new Pose(31.500, 131.000),
+                                    new Pose(107.000, 54.000),
                                     new Pose(58.500, 82.000)
                             )
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(90), Math.toRadians(175))
+                    .setLinearHeadingInterpolation(Math.toRadians(142), Math.toRadians(142))
                     .build();
 
             intake1 = follower.pathBuilder()
                     .addPath(
                             new BezierLine(
                                     new Pose(58.500, 82.000),
-                                    new Pose(15.500+value, 82.000)
+                                    new Pose(15.500, 82.000)
                             )
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(175), Math.toRadians(180))
@@ -457,9 +457,9 @@ public class BlueUp7 extends OpMode {
             open1 = follower.pathBuilder()
                     .addPath(
                             new BezierCurve(
-                                    new Pose(15.500+value, 82.000),
+                                    new Pose(15.500, 82.000),
                                     new Pose(21.500, 78.000),
-                                    new Pose(15.500+value, 74.000)
+                                    new Pose(15.500, 74.000)
                             )
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
@@ -468,7 +468,7 @@ public class BlueUp7 extends OpMode {
             shoot2 = follower.pathBuilder()
                     .addPath(
                             new BezierLine(
-                                    new Pose(15.500+value, 74.000),
+                                    new Pose(15.500, 74.000),
                                     new Pose(57.500, 82.000)
                             )
                     )
@@ -480,7 +480,7 @@ public class BlueUp7 extends OpMode {
                             new BezierCurve(
                                     new Pose(57.500, 82.000),
                                     new Pose(57.500, 56.000),
-                                    new Pose(15.500+value, 58.000)
+                                    new Pose(15.500, 58.000)
                             )
                     )
                     .setLinearHeadingInterpolation(Math.toRadians(240), Math.toRadians(180))
