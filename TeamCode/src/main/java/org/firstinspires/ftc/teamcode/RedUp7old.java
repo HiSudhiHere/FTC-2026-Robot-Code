@@ -1,10 +1,11 @@
 package org.firstinspires.ftc.teamcode;
 
 import com.pedropathing.geometry.BezierCurve;
-import com.qualcomm.hardware.limelightvision.Limelight3A;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.util.ElapsedTime;
+
 
 import com.bylazar.configurables.annotations.Configurable;
 import com.bylazar.telemetry.TelemetryManager;
@@ -15,60 +16,73 @@ import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.paths.PathChain;
 import com.pedropathing.geometry.Pose;
+import com.pedropathing.paths.callbacks.ParametricCallback;
 
 
 import org.firstinspires.ftc.teamcode.subsystems.IntakeSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.ServoSubsystem;
-import org.firstinspires.ftc.teamcode.subsystems.ShooterSubsystemRedUpAuto;
-import org.firstinspires.ftc.teamcode.subsystems.BLTurret;
+import org.firstinspires.ftc.teamcode.subsystems.ShooterSubsystem;
+import org.firstinspires.ftc.teamcode.subsystems.TurretSubsystem;
 
-@Autonomous(name = "BlueUp7", group = "Autonomous")
+@Disabled
+@Autonomous(name = "RedUp7-old", group = "Autonomous")
 @Configurable
-public class BlueUp7 extends OpMode {
+public class RedUp7old extends OpMode {
 
     private TelemetryManager panelsTelemetry;
     public Follower follower;
     private int pathState = 0;
     private Paths paths;
-    private ShooterSubsystemRedUpAuto shooter;
+    private ShooterSubsystem shooter;
     private IntakeSubsystem intake;
     private ServoSubsystem servos;
-    private BLTurret turret;
+    private TurretSubsystem turret;
 
     private ElapsedTime waitTimer = new ElapsedTime();
-    private static int value = 5;
+    private static int value = 2;
     private static final double STOPPER_OPEN = 0.6;
     private static final double STOPPER_CLOSED = 0.3;
-    private static final double SHOOT_TIME =900;
-    private static final double OPEN_WAIT_TIME = 200;
-    private static final double INTAKE_WAIT_TIME = 1000;
+    private static final double SHOOT_TIME =850;
+    private static final double OPEN_WAIT_TIME = 1000;
+    private static final double INTAKE_WAIT_TIME = 800;
 
-    private Limelight3A limelight;
+    //Turret Angles
+    private static final double SHOOT1_TURRET = 40;
+    private static final double SHOOT2_TURRET = 35;
+    private static final double SHOOT3_TURRET = 30;
+    private static final double SHOOT4_TURRET = 28;
+    private static final double SHOOT5_TURRET = 28;
+    private static final double SHOOT6_TURRET = 28;
+    private static final double SHOOT7_TURRET = 28;
 
+    private boolean firstShotStarted = false;
+    private ElapsedTime movingShootTimer = new ElapsedTime();
+
+    private static final double SHOOT1_MOVING_SHOOT_TIME = 400; // ms
+    private boolean shoot1MovingShotActive = false;
+    private ElapsedTime shoot1MovingShotTimer = new ElapsedTime();
     @Override
     public void init() {
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
         follower = Constants.createFollower(hardwareMap);
-        follower.setStartingPose(new Pose(31, 131, Math.toRadians(90)));
+        follower.setStartingPose(new Pose(110, 131, Math.toRadians(90)));
+        follower.setMaxPower(0.90);
 
-        shooter = new ShooterSubsystemRedUpAuto (hardwareMap);
+        shooter = new ShooterSubsystem(hardwareMap);
         intake = new IntakeSubsystem(hardwareMap);
         servos = new ServoSubsystem(hardwareMap);
+        turret = new TurretSubsystem(hardwareMap);
 
-        turret = new BLTurret(hardwareMap);
-
-        limelight = hardwareMap.get(Limelight3A.class, "limelight");
-        limelight.pipelineSwitch(0);
-        limelight.start();
+        turret.setFieldAngle(43);
 
         servos.setStopper(STOPPER_CLOSED);
-        servos.setHudder(0.11);
+        servos.setHudder(0.4);
 
         paths = new Paths(follower);
 
         panelsTelemetry.debug("Status", "Initialized");
-        panelsTelemetry.update(telemetry);
+        panelsTelemetry.update(telemetry );
         follower.setMaxPower(0.9);
 
     }
@@ -76,19 +90,40 @@ public class BlueUp7 extends OpMode {
     @Override
     public void loop() {
         follower.update();
-        turret.trackAprilTag();
+        turret.update(Math.toDegrees(follower.getPose().getHeading()));
+        double x = follower.getPose().getX();
+        double y = follower.getPose().getY();
+
+        if(!firstShotStarted && y>=104 && y<=118){
+            firstShotStarted = true;
+            shooter.shootVERYSLOW();
+            servos.setStopper(STOPPER_OPEN);
+            intake.intakeIn();
+            movingShootTimer.reset();
+        }
+
+        if (pathState == 1 ||
+                pathState == 8 ||
+                pathState == 15 ||
+                pathState == 22 ||
+                pathState == 29 ||
+                pathState == 36 ||
+                pathState == 43) {
+
+            double distanceToShoot =
+                    Math.hypot(84.0 - x, 82.0 - y);
+
+            if (distanceToShoot < 12) {
+                follower.setMaxPower(0.4);
+            } else {
+                follower.setMaxPower(0.9);
+            }
+        }
         autonomousPathUpdate();
 
         telemetry.addData("Path State", pathState);
         telemetry.addData("X", "%.2f", follower.getPose().getX());
         telemetry.addData("Y", "%.2f", follower.getPose().getY());
-        if (turret.isTagFound()) {
-            telemetry.addLine("******** APRILTAG FOUND ********");
-        } else {
-            telemetry.addLine("-------- SEARCHING --------");
-        }
-        telemetry.addData("TX", "%.2f", turret.getTx());
-        telemetry.addData("Distance", "%.1f", turret.getDistance());
         telemetry.addData("Heading Deg", "%.2f", Math.toDegrees(follower.getPose().getHeading()));
         telemetry.addData("Average Velocity", "%.1f", shooter.getAverageVelocity());
         telemetry.addData("Turret Position", turret.getPosition());
@@ -101,7 +136,8 @@ public class BlueUp7 extends OpMode {
         panelsTelemetry.update(telemetry);
     }
 
-    private void startShootPath(PathChain path, int nextState) {
+    private void startShootPath(PathChain path, int nextState, double turretAngle) {
+        turret.setFieldAngle(turretAngle);
         shooter.shootSlow();
         intake.stop();
         servos.setStopper(STOPPER_CLOSED);
@@ -109,12 +145,19 @@ public class BlueUp7 extends OpMode {
         follower.followPath(path);
         pathState = nextState;
     }
+    private void startShootPath1(PathChain path, int nextState, double turretAngle) {
+        turret.setFieldAngle(turretAngle);
+        shooter.shootVERYSLOW();
+        intake.stop();
 
+        follower.followPath(path);
+        pathState = nextState;
+    }
     private void runShootSequence(int nextState) {
         shooter.shootSlow();
         servos.setStopper(STOPPER_OPEN);
 
-        // If this is physically opposite, change intakeOut() to intakeIn()
+        // If this is physically opposite, change intakeIn() to intakeIn()
         intake.intakeIn();
 
         if (waitTimer.milliseconds() >= SHOOT_TIME) {
@@ -129,7 +172,7 @@ public class BlueUp7 extends OpMode {
         shooter.stop();
         servos.setStopper(STOPPER_CLOSED);
 
-        // If this is physically opposite, change intakeOut() to intakeIn()
+        // If this is physically opposite, change intakeIn() to intakeIn()
         intake.intakeIn();
 
         follower.followPath(path);
@@ -175,11 +218,12 @@ public class BlueUp7 extends OpMode {
         }
     }
 
+
     public void autonomousPathUpdate() {
         switch (pathState) {
 
             case 0:
-                startShootPath(paths.shoot1, 1);
+                startShootPath1(paths.shoot1, 1, SHOOT1_TURRET);
                 break;
 
             case 1:
@@ -215,7 +259,7 @@ public class BlueUp7 extends OpMode {
                 break;
 
             case 7:
-                startShootPath(paths.shoot2, 8);
+                startShootPath(paths.shoot2, 8, SHOOT2_TURRET);
                 break;
 
             case 8:
@@ -251,7 +295,7 @@ public class BlueUp7 extends OpMode {
                 break;
 
             case 14:
-                startShootPath(paths.shoot3, 15);
+                startShootPath(paths.shoot3, 15, SHOOT3_TURRET);
                 break;
 
             case 15:
@@ -287,7 +331,7 @@ public class BlueUp7 extends OpMode {
                 break;
 
             case 21:
-                startShootPath(paths.shoot4, 22);
+                startShootPath(paths.shoot4, 22, SHOOT4_TURRET);
                 break;
 
             case 22:
@@ -323,7 +367,7 @@ public class BlueUp7 extends OpMode {
                 break;
 
             case 28:
-                startShootPath(paths.shoot5, 29);
+                startShootPath(paths.shoot5, 29, SHOOT5_TURRET);
                 break;
 
             case 29:
@@ -359,7 +403,7 @@ public class BlueUp7 extends OpMode {
                 break;
 
             case 35:
-                startShootPath(paths.shoot6, 36);
+                startShootPath(paths.shoot6, 36, SHOOT6_TURRET);
                 break;
 
             case 36:
@@ -395,7 +439,7 @@ public class BlueUp7 extends OpMode {
                 break;
 
             case 42:
-                startShootPath(paths.shoot7, 43);
+                startShootPath(paths.shoot7, 43, SHOOT7_TURRET);
                 break;
 
             case 43:
@@ -440,202 +484,165 @@ public class BlueUp7 extends OpMode {
         public PathChain shoot7;
 
         public Paths(Follower follower) {
+
             shoot1 = follower.pathBuilder()
-                    .addPath(
-                            new BezierLine(
-                                    new Pose(31.500, 131.000),
-                                    new Pose(58.500, 82.000)
-                            )
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(90), Math.toRadians(175))
+                    .addPath(new BezierLine(
+                            new Pose(110.000, 131.000),
+                            new Pose(83.000, 82.000)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(90), Math.toRadians(0))
                     .build();
 
             intake1 = follower.pathBuilder()
-                    .addPath(
-                            new BezierLine(
-                                    new Pose(58.500, 82.000),
-                                    new Pose(15.500+value, 82.000)
-                            )
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(175), Math.toRadians(180))
+                    .addPath(new BezierLine(
+                            new Pose(83.000, 82.000),
+                            new Pose(126.000-value, 82.000)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(5), Math.toRadians(0))
                     .build();
 
             open1 = follower.pathBuilder()
-                    .addPath(
-                            new BezierCurve(
-                                    new Pose(14.500+value, 82.000),
-                                    new Pose(20.500+value, 78.000),
-                                    new Pose(14.500+value, 74.000-2)
-                            )
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .addPath(new BezierCurve(
+                            new Pose(126.000-value, 82.000),
+                            new Pose(120.000-value, 78.000),
+                            new Pose(126.000-value, 74.000)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(0))
                     .build();
 
             shoot2 = follower.pathBuilder()
-                    .addPath(
-                            new BezierLine(
-                                    new Pose(13.500+value, 74.000),
-                                    new Pose(57.500, 82.000)
-                            )
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(240))
+                    .addPath(new BezierLine(
+                            new Pose(126.000-value, 74.000),
+                            new Pose(84.000, 82.000)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(-60))
                     .build();
 
             intake2 = follower.pathBuilder()
-                    .addPath(
-                            new BezierCurve(
-                                    new Pose(57.500, 82.000),
-                                    new Pose(57.500, 56.000),
-                                    new Pose(15.500+value, 58.000)
-                            )
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(240), Math.toRadians(180))
+                    .addPath(new BezierCurve(
+                            new Pose(84.000, 82.000),
+                            new Pose(84.000, 56.000),
+                            new Pose(128.000-value, 58.000+1)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(-60), Math.toRadians(0))
                     .build();
 
             open2 = follower.pathBuilder()
-                    .addPath(
-                            new BezierCurve(
-                                    new Pose(14.500, 82.000),
-                                    new Pose(20.500, 78.000),
-                                    new Pose(14.500, 74.000+3)
-                            )
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                    .addPath(new BezierCurve(
+                            new Pose(126.0000, 58.000),
+                            new Pose(121.000, 61.000),
+                            new Pose(126.000, 63.000+2)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(0))
                     .build();
 
             shoot3 = follower.pathBuilder()
-                    .addPath(
-                            new BezierLine(
-                                    new Pose(15.500, 63.000),
-                                    new Pose(57.500, 82.000)
-                            )
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(220))
+                    .addPath(new BezierLine(
+                            new Pose(126.000-value, 63.000),
+                            new Pose(84.000, 82.000)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(-40))
                     .build();
 
             pathTOintake1 = follower.pathBuilder()
-                    .addPath(
-                            new BezierCurve(
-                                    new Pose(57.500, 82.000),
-                                    new Pose(43.500, 64.000),
-                                    new Pose(18.500, 64.000)
-                            )
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(220), Math.toRadians(180))
+                    .addPath(new BezierCurve(
+                            new Pose(84.000, 82.000),
+                            new Pose(98.000, 64.000),
+                            new Pose(123.000, 64.000)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(-40), Math.toRadians(0))
                     .build();
 
             intake3 = follower.pathBuilder()
-                    .addPath(
-                            new BezierLine(
-                                    new Pose(18.500, 64.000),
-                                    new Pose(14.500-4, 57.000-4)
-                            )
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(143))
+                    .addPath(new BezierLine(
+                            new Pose(123.000, 64.000),
+                            new Pose(128.000+4, 56.000+4)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(37))
                     .build();
 
             shoot4 = follower.pathBuilder()
-                    .addPath(
-                            new BezierCurve(
-                                    new Pose(13.500, 56.000),
-                                    new Pose(48.688, 64.500),
-                                    new Pose(57.500, 82.000)
-                            )
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(220))
+                    .addPath(new BezierCurve(
+                            new Pose(128.000-value, 56.000),
+                            new Pose(93.000, 64.500),
+                            new Pose(84.000, 82.000)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(-40))
                     .build();
 
             pathTOintake2 = follower.pathBuilder()
-                    .addPath(
-                            new BezierCurve(
-                                    new Pose(57.500, 82.000),
-                                    new Pose(43.500, 64.000),
-                                    new Pose(18.500, 64.000)
-                            )
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(220), Math.toRadians(180))
+                    .addPath(new BezierCurve(
+                            new Pose(84.000, 82.000),
+                            new Pose(98.000, 64.000),
+                            new Pose(123.000, 64.000)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(-40), Math.toRadians(0))
                     .build();
 
             intake4 = follower.pathBuilder()
-                    .addPath(
-                            new BezierLine(
-                                    new Pose(18.500, 64.000),
-                                    new Pose(14.500+2, 57.000+2)
-                            )
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(143))
+                    .addPath(new BezierLine(
+                            new Pose(123.000, 64.000),
+                            new Pose(128.000+4, 56.000+4)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(37))
                     .build();
 
             shoot5 = follower.pathBuilder()
-                    .addPath(
-                            new BezierLine(
-                                    new Pose(13.500, 56.000),
-                                    new Pose(57.500, 82.000)
-                            )
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(220))
+                    .addPath(new BezierLine(
+                            new Pose(128.000, 56.000),
+                            new Pose(84.000, 82.000)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(-40))
                     .build();
 
             pathTOintake3 = follower.pathBuilder()
-                    .addPath(
-                            new BezierCurve(
-                                    new Pose(57.500, 82.000),
-                                    new Pose(43.500, 64.000),
-                                    new Pose(18.500, 64.000)
-                            )
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(220), Math.toRadians(180))
+                    .addPath(new BezierCurve(
+                            new Pose(84.000, 82.000),
+                            new Pose(98.000, 64.000),
+                            new Pose(123.000, 64.000)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(-40), Math.toRadians(0))
                     .build();
 
             intake5 = follower.pathBuilder()
-                    .addPath(
-                            new BezierLine(
-                                    new Pose(18.500, 64.000),
-                                    new Pose(14.500+2, 57.000+2)
-                            )
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(143))
+                    .addPath(new BezierLine(
+                            new Pose(123.000, 64.000),
+                            new Pose(128.000+4, 56.000+4)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(37))
                     .build();
 
             shoot6 = follower.pathBuilder()
-                    .addPath(
-                            new BezierLine(
-                                    new Pose(13.500, 56.000),
-                                    new Pose(57.500, 82.000)
-                            )
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(220))
+                    .addPath(new BezierLine(
+                            new Pose(128.000, 56.000),
+                            new Pose(84.000, 82.000)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(-40))
                     .build();
 
             pathTOintake4 = follower.pathBuilder()
-                    .addPath(
-                            new BezierCurve(
-                                    new Pose(57.500, 82.000),
-                                    new Pose(43.500, 64.000),
-                                    new Pose(18.500, 64.000)
-                            )
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(220), Math.toRadians(180))
+                    .addPath(new BezierCurve(
+                            new Pose(84.000, 82.000),
+                            new Pose(98.000, 64.000),
+                            new Pose(123.000, 64.000)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(-40), Math.toRadians(0))
                     .build();
 
             intake6 = follower.pathBuilder()
-                    .addPath(
-                            new BezierLine(
-                                    new Pose(18.500, 64.000),
-                                    new Pose(14.500+2, 57.000+2)
-                            )
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(143))
+                    .addPath(new BezierLine(
+                            new Pose(123.000, 64.000),
+                            new Pose(128.000+4, 56.000+4)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(37))
                     .build();
 
             shoot7 = follower.pathBuilder()
-                    .addPath(
-                            new BezierLine(
-                                    new Pose(13.500, 56.000),
-                                    new Pose(57.500, 82.000)
-                            )
-                    )
-                    .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(220))
+                    .addPath(new BezierLine(
+                            new Pose(128.000, 56.000),
+                            new Pose(84.000, 82.000)
+                    ))
+                    .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(-40))
                     .build();
         }
     }

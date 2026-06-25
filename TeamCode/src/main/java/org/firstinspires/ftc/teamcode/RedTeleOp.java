@@ -21,8 +21,8 @@ import org.firstinspires.ftc.teamcode.subsystems.IntakeSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.ServoSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.RGBSubsystem;
 
-@TeleOp(name = "Blue Teleop")
-public class BlueTeleOp extends LinearOpMode {
+@TeleOp(name = "Red Teleop")
+public class RedTeleOp extends LinearOpMode {
 
     private DriveSubsystem drive;
     private ShooterSubsystem shooter;
@@ -91,7 +91,7 @@ public class BlueTeleOp extends LinearOpMode {
         turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         turret.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        limelight.pipelineSwitch(0);
+        limelight.pipelineSwitch(1);
         limelight.start();
         servos.setStopper(STOPPER_CLOSED);
 
@@ -243,6 +243,9 @@ public class BlueTeleOp extends LinearOpMode {
             else {
                 shooter.stop();
             }
+            if(shooter.getCurrentVelocity() > 1000 && gamepad1.right_bumper == true){
+                servos.setStopper(STOPPER_OPEN);
+            }
 
 
             LLResult result = limelight.getLatestResult();
@@ -306,7 +309,7 @@ public class BlueTeleOp extends LinearOpMode {
             telemetry.update();
         }
 
-        if(shooter.getCurrentVelocity() > 1000 && gamepad1.right_bumper == true){
+        if(shooter.getCurrentVelocity() > 1000){
             servos.setStopper(STOPPER_OPEN);
         }
 
