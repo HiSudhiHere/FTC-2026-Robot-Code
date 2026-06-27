@@ -16,7 +16,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 
 import org.firstinspires.ftc.teamcode.subsystems.DriveSubsystem;
-import org.firstinspires.ftc.teamcode.subsystems.ShooterSubsystem;
+import org.firstinspires.ftc.teamcode.subsystems.ShooterSubsystemTele;
 import org.firstinspires.ftc.teamcode.subsystems.IntakeSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.ServoSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.RGBSubsystem;
@@ -25,7 +25,7 @@ import org.firstinspires.ftc.teamcode.subsystems.RGBSubsystem;
 public class RedTeleOp extends LinearOpMode {
 
     private DriveSubsystem drive;
-    private ShooterSubsystem shooter;
+    private ShooterSubsystemTele shooter;
     private IntakeSubsystem intake;
     private DcMotorEx turret;
     private Limelight3A limelight;
@@ -37,13 +37,13 @@ public class RedTeleOp extends LinearOpMode {
 
 
     private Servo hooder;
-
+    public boolean allballsin = false;
 
     // Tune these
 
     // Servo Positions
     private static final double STOPPER_OPEN = 0.6;
-    private static final double DRIVE_SPEED = 0.8;
+    private static final double DRIVE_SPEED = 0.9;
     private static final double STOPPER_CLOSED = 0.3;
     private final ElapsedTime intakeTimer = new ElapsedTime();
 
@@ -68,7 +68,7 @@ public class RedTeleOp extends LinearOpMode {
     public void runOpMode() {
 
         drive = new DriveSubsystem(hardwareMap);
-        shooter = new ShooterSubsystem(hardwareMap);
+        shooter = new ShooterSubsystemTele(hardwareMap);
         intake = new IntakeSubsystem(hardwareMap);
         servos = new ServoSubsystem(hardwareMap);
         rgb = new RGBSubsystem(hardwareMap);
@@ -120,37 +120,53 @@ public class RedTeleOp extends LinearOpMode {
             // INTAKE CONTROL..
             // =========================
             if (gamepad1.left_bumper) {
-                intake.intakeOut();
+                intake.intakeIn();
 
 
             }
             else if (gamepad1.left_trigger > 0.1) {
-                intake.intakeIn();
+                intake.intakeOut();
             }
             else {
                 intake.stop();
             }
 
-            if(intake.getVelocity()<200)
+            if(servos.getStopperPosition()==0.6)
             {
-                rgb.blue();
-            }
-            if(shooter.getAverageVelocity()>1500)
-            {
-                rgb.green();
+                // rgb.green();
             }
 
 
+            if(gamepad1.left_bumper == true && Math.abs(intake.getVelocity())<350 && gamepad1.y==false){
+
+                allballsin = true;
+            }
+            if(Math.abs(intake.getVelocity())>350){
+
+                allballsin = false;
+            }
+            if(allballsin == true){
+                rgb.yellow();
+            }
+            if(allballsin==false){
+                rgb.off();
+            }
             // =========================
             // STOPPER SERVO CONTROL
             // =========================
-            if (gamepad2.dpad_down) {
+            if( gamepad1.y == false && gamepad1.left_bumper == true){
+                servos.setStopper(STOPPER_CLOSED);
+            }
+            if (shooter.getAverageVelocity()>800 && gamepad1.y == true) {
+                servos.setStopper(STOPPER_OPEN);
+
+            }
+            if (shooter.getAverageVelocity()<1000 && gamepad1.y == false) {
                 servos.setStopper(STOPPER_CLOSED);
             }
 
-            if (gamepad2.dpad_up) {
-                servos.setStopper(STOPPER_OPEN);
-            }
+
+
 
             // =========================
             // HOODER SERVO CONTROL
@@ -161,12 +177,6 @@ public class RedTeleOp extends LinearOpMode {
 
             if (gamepad2.right_trigger>0.1) {
                 servos.setHudder(0.12);
-            }
-
-            if (gamepad2.a && intakeState == 0) {
-                intake.intakeOut();
-                intakeTimer.reset();
-                intakeState = 1;
             }
 
             /*
@@ -243,9 +253,6 @@ public class RedTeleOp extends LinearOpMode {
             else {
                 shooter.stop();
             }
-            if(shooter.getCurrentVelocity() > 1000 && gamepad1.right_bumper == true){
-                servos.setStopper(STOPPER_OPEN);
-            }
 
 
             LLResult result = limelight.getLatestResult();
@@ -268,7 +275,9 @@ public class RedTeleOp extends LinearOpMode {
 
                 turret.setPower(applyTurretWrapLimit(turretPower));
 
+
                 telemetry.addData("Tag Visible", true);
+                telemetry.addData("Intake Velocity", intake.getVelocity());
                 telemetry.addData("TX Raw", tx);
                 telemetry.addData("TX Filtered", filteredTx);
                 telemetry.addData("Turret Power", turretPower);
@@ -293,6 +302,8 @@ public class RedTeleOp extends LinearOpMode {
             telemetry.addData("Turret Position",
                     turret.getCurrentPosition());
 
+            telemetry.addData("Intake Velocity", intake.getVelocity());
+
             telemetry.addLine("===== SHOOTER =====");
 
             telemetry.addData("Left Velocity",
@@ -307,10 +318,6 @@ public class RedTeleOp extends LinearOpMode {
             telemetry.addData("Y (in)", "%.1f", robotY);
             telemetry.addData("Heading", "%.1f", heading);
             telemetry.update();
-        }
-
-        if(shooter.getCurrentVelocity() > 1000){
-            servos.setStopper(STOPPER_OPEN);
         }
 
         turret.setPower(0);

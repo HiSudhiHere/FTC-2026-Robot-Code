@@ -18,7 +18,7 @@ import com.pedropathing.geometry.Pose;
 
 import org.firstinspires.ftc.teamcode.subsystems.IntakeSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.ServoSubsystem;
-import org.firstinspires.ftc.teamcode.subsystems.ShooterSubsystemRedUpAuto;
+import org.firstinspires.ftc.teamcode.subsystems.ShooterSubsystemTele;
 import org.firstinspires.ftc.teamcode.subsystems.TurretSubsystem;
 @Disabled
 @Autonomous(name = "RedDown8", group = "Autonomous")
@@ -29,7 +29,7 @@ public class RedDown8 extends OpMode {
     public Follower follower;
     private int pathState = 0;
     private Paths paths;
-    private ShooterSubsystemRedUpAuto shooter;
+    private ShooterSubsystemTele shooter;
     private IntakeSubsystem intake;
     private ServoSubsystem servos;
     private TurretSubsystem turret;
@@ -51,7 +51,7 @@ public class RedDown8 extends OpMode {
         follower = Constants.createFollower(hardwareMap);
         follower.setStartingPose(new Pose(101, 8, Math.toRadians(0)));
 
-        shooter = new ShooterSubsystemRedUpAuto(hardwareMap);
+        shooter = new ShooterSubsystemTele(hardwareMap);
         intake = new IntakeSubsystem(hardwareMap);
         servos = new ServoSubsystem(hardwareMap);
         turret = new TurretSubsystem(hardwareMap);

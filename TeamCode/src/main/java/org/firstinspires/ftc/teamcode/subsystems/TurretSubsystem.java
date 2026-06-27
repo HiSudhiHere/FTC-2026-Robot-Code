@@ -5,23 +5,18 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-import com.qualcomm.hardware.limelightvision.Limelight3A;
-
 public class TurretSubsystem {
 
     private final DcMotorEx turret;
 
-    // 537.7 CPR * (100/20)
-    private static final double TICKS_PER_DEGREE = 6.603;// 7.47-old
+    private static final double TICKS_PER_DEGREE = 6.603;
 
     private static final double MIN_ANGLE = -120.0;
     private static final double MAX_ANGLE = 120.0;
 
-    // PIDF
     private double kP = 0.013;
-    private double kI = 0.0000;
+    private double kI = 0.0;
     private double kD = 0.00001;
-    private double kF = 0.020;
 
     private double integral = 0;
     private double lastError = 0;
@@ -29,24 +24,18 @@ public class TurretSubsystem {
     private double lockedFieldAngle = 0;
     private double turretOffsetDeg = 0;
 
+    private double targetTurretDeg = 0;
+    private double targetTicks = 0;
+
     private double lastPosition = 0;
     private double turretVelocity = 0;
-
-//    private Limelight3A limelight;
-
 
     private final ElapsedTime pidTimer = new ElapsedTime();
 
     public TurretSubsystem(HardwareMap hardwareMap) {
-
         turret = hardwareMap.get(DcMotorEx.class, "turret");
 
-//        limelight = hardwareMap.get(Limelight3A.class, "limelight");
-//        limelight.start();
-
-        turret.setZeroPowerBehavior(
-                DcMotor.ZeroPowerBehavior.BRAKE);
-
+        turret.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
@@ -54,30 +43,25 @@ public class TurretSubsystem {
         pidTimer.reset();
     }
 
-    /**
-     * Field-centric turret lock
-     */
     public void update(double robotHeadingDeg) {
 
-        double turretTargetDeg =
+        double rawTarget =
                 lockedFieldAngle
                         - robotHeadingDeg
                         + turretOffsetDeg;
 
-        turretTargetDeg = Math.max(
+        targetTurretDeg = angleWrap(rawTarget);
+
+        targetTurretDeg = Math.max(
                 MIN_ANGLE,
-                Math.min(MAX_ANGLE, turretTargetDeg));
+                Math.min(MAX_ANGLE, targetTurretDeg)
+        );
 
-        int targetTicks =
-                (int) (turretTargetDeg * TICKS_PER_DEGREE);
+        targetTicks = targetTurretDeg * TICKS_PER_DEGREE;
 
-        int currentTicks =
-                turret.getCurrentPosition();
+        int currentTicks = turret.getCurrentPosition();
+        double error = targetTicks - currentTicks;
 
-        double error =
-                targetTicks - currentTicks;
-
-        // Deadband to prevent oscillation
         if (Math.abs(error) < 8) {
             turret.setPower(0);
             integral = 0;
@@ -85,23 +69,16 @@ public class TurretSubsystem {
             return;
         }
 
-        double dt = pidTimer.seconds();
-
+        double dt = Math.max(pidTimer.seconds(), 0.001);
         pidTimer.reset();
 
-        turretVelocity = (currentTicks - lastPosition) / Math.max(dt, 0.001);
+        turretVelocity = (currentTicks - lastPosition) / dt;
         lastPosition = currentTicks;
 
         integral += error * dt;
+        integral = Math.max(-5000, Math.min(5000, integral));
 
-        integral = Math.max(
-                -5000,
-                Math.min(5000, integral));
-
-        double derivative =
-                (error - lastError)
-                        / Math.max(dt, 0.001);
-
+        double derivative = (error - lastError) / dt;
         derivative = Math.max(-4000, Math.min(4000, derivative));
 
         double power =
@@ -112,92 +89,57 @@ public class TurretSubsystem {
 
         if (Math.abs(error) > 200) {
             power += Math.signum(error) * 0.10;
-        }
-        else if (Math.abs(error) > 80) {
+        } else if (Math.abs(error) > 80) {
             power += Math.signum(error) * 0.06;
-        }
-        else if (Math.abs(error) > 20) {
+        } else if (Math.abs(error) > 20) {
             power += Math.signum(error) * 0.03;
         }
-
-        power = Math.max(
-                -1.0,
-                Math.min(1.0, power));
 
         double maxPower;
 
         if (Math.abs(error) > 300) {
             maxPower = 1.00;
-        }
-        else if (Math.abs(error) > 120) {
+        } else if (Math.abs(error) > 120) {
             maxPower = 0.70;
-        }
-        else if (Math.abs(error) > 40) {
+        } else if (Math.abs(error) > 40) {
             maxPower = 0.45;
-        }
-        else {
+        } else {
             maxPower = 0.18;
         }
 
         power = Math.max(-maxPower, Math.min(maxPower, power));
-        turret.setPower(power);
 
+        turret.setPower(power);
         lastError = error;
     }
 
-    /**
-     * D-pad left
-     */
-    public void aimLeft() {
-        lockedFieldAngle += 1;
+    private double angleWrap(double angle) {
+        while (angle > 180) angle -= 360;
+        while (angle <= -180) angle += 360;
+        return angle;
     }
 
-    /**
-     * D-pad right
-     */
-    public void aimRight() {
-        lockedFieldAngle -= 1;
-    }
-
-    /**
-     * Direct field angle set
-     */
     public void setFieldAngle(double angle) {
         lockedFieldAngle = angle;
     }
 
-    /**
-     * Zero turret lock
-     */
+    public void setOffset(double offsetDeg) {
+        turretOffsetDeg = offsetDeg;
+    }
+
     public void resetLock() {
         lockedFieldAngle = 0;
     }
 
-    /**
-     * Encoder reset
-     */
     public void resetEncoder() {
         turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
     }
 
-    /**
-     * PID tuning
-     */
-    public void setPIDF(
-            double p,
-            double i,
-            double d,
-            double f) {
-
+    public void setPIDF(double p, double i, double d, double f) {
         kP = p;
         kI = i;
         kD = d;
-        kF = f;
-    }
-
-    public void setOffset(double offsetDeg) {
-        turretOffsetDeg = offsetDeg;
     }
 
     public void stop() {
@@ -212,19 +154,15 @@ public class TurretSubsystem {
         return lockedFieldAngle;
     }
 
-    public double getKP() {
-        return kP;
+    public double getTargetTurretDeg() {
+        return targetTurretDeg;
     }
 
-    public double getKD() {
-        return kD;
+    public double getTargetTicks() {
+        return targetTicks;
     }
 
-    public double getKF() {
-        return kF;
-    }
-
-    public void trackAprilTag() {
-
+    public double getTurretAngleDeg() {
+        return turret.getCurrentPosition() / TICKS_PER_DEGREE;
     }
 }

@@ -18,6 +18,7 @@ public class RGBSubsystem {
     public void blue() {
         rgb.setPosition(0.61);
     }
+    public void yellow() { rgb.setPosition(0.388);}
 
     public void green() {
         rgb.setPosition(0.50);

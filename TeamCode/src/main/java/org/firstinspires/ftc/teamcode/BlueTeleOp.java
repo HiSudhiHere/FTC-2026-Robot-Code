@@ -16,7 +16,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 
 import org.firstinspires.ftc.teamcode.subsystems.DriveSubsystem;
-import org.firstinspires.ftc.teamcode.subsystems.ShooterSubsystem;
+import org.firstinspires.ftc.teamcode.subsystems.ShooterSubsystemTele;
 import org.firstinspires.ftc.teamcode.subsystems.IntakeSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.ServoSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.RGBSubsystem;
@@ -25,7 +25,7 @@ import org.firstinspires.ftc.teamcode.subsystems.RGBSubsystem;
 public class BlueTeleOp extends LinearOpMode {
 
     private DriveSubsystem drive;
-    private ShooterSubsystem shooter;
+    private ShooterSubsystemTele shooter;
     private IntakeSubsystem intake;
     private DcMotorEx turret;
     private Limelight3A limelight;
@@ -43,13 +43,15 @@ public class BlueTeleOp extends LinearOpMode {
 
     // Servo Positions
     private static final double STOPPER_OPEN = 0.6;
-    private static final double DRIVE_SPEED = 0.8;
+    private static final double DRIVE_SPEED = 0.9;
     private static final double STOPPER_CLOSED = 0.3;
     private final ElapsedTime intakeTimer = new ElapsedTime();
 
     private int intakeState = 0;
     private double filteredTx = 0;
     private double lastAimError = 0;
+
+
     private static final double CLOSE_KP = 0.015;
     private static final double FAR_KP = 0.030;
     private static final double KD = 0.010;
@@ -68,7 +70,7 @@ public class BlueTeleOp extends LinearOpMode {
     public void runOpMode() {
 
         drive = new DriveSubsystem(hardwareMap);
-        shooter = new ShooterSubsystem(hardwareMap);
+        shooter = new ShooterSubsystemTele(hardwareMap);
         intake = new IntakeSubsystem(hardwareMap);
         servos = new ServoSubsystem(hardwareMap);
         rgb = new RGBSubsystem(hardwareMap);
@@ -120,35 +122,34 @@ public class BlueTeleOp extends LinearOpMode {
             // INTAKE CONTROL..
             // =========================
             if (gamepad1.left_bumper) {
-                intake.intakeOut();
+                intake.intakeIn();
 
 
             }
             else if (gamepad1.left_trigger > 0.1) {
-                intake.intakeIn();
+                intake.intakeOut();
             }
             else {
                 intake.stop();
             }
 
-            if(intake.getVelocity()<200)
-            {
-                rgb.blue();
+            if (shooter.getAverageVelocity()>1200 && gamepad1.y == true) {
+                servos.setStopper(STOPPER_OPEN);
             }
-            if(shooter.getAverageVelocity()>1500)
-            {
-                rgb.green();
+            if (shooter.getAverageVelocity()<1200) {
+                servos.setStopper(STOPPER_CLOSED);
             }
 
 
             // =========================
             // STOPPER SERVO CONTROL
             // =========================
+
             if (gamepad2.dpad_down) {
                 servos.setStopper(STOPPER_CLOSED);
             }
 
-            if (gamepad2.dpad_up) {
+            if (shooter.getAverageVelocity()>1200) {
                 servos.setStopper(STOPPER_OPEN);
             }
 
@@ -287,8 +288,10 @@ public class BlueTeleOp extends LinearOpMode {
                 turret.setPower(applyTurretWrapLimit(-0.3));
             }
 
-            telemetry.addData("Turret Position",
-                    turret.getCurrentPosition());
+            double turretAngle = turret.getCurrentPosition() / TICKS_PER_DEGREE;
+
+            telemetry.addData("Turret Angle", "%.2f°", turretAngle);
+            telemetry.addData("Encoder Ticks", turret.getCurrentPosition());
 
             telemetry.addLine("===== SHOOTER =====");
 
@@ -304,10 +307,6 @@ public class BlueTeleOp extends LinearOpMode {
             telemetry.addData("Y (in)", "%.1f", robotY);
             telemetry.addData("Heading", "%.1f", heading);
             telemetry.update();
-        }
-
-        if(shooter.getCurrentVelocity() > 1000 && gamepad1.right_bumper == true){
-            servos.setStopper(STOPPER_OPEN);
         }
 
         turret.setPower(0);

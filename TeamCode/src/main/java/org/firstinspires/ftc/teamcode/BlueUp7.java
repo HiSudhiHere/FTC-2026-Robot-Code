@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode;
 
 import com.pedropathing.geometry.BezierCurve;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -19,9 +20,9 @@ import com.pedropathing.geometry.Pose;
 
 import org.firstinspires.ftc.teamcode.subsystems.IntakeSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.ServoSubsystem;
-import org.firstinspires.ftc.teamcode.subsystems.ShooterSubsystemRedUpAuto;
+import org.firstinspires.ftc.teamcode.subsystems.ShooterSubsystemTele;
 import org.firstinspires.ftc.teamcode.subsystems.BLTurret;
-
+@Disabled
 @Autonomous(name = "BlueUp7", group = "Autonomous")
 @Configurable
 public class BlueUp7 extends OpMode {
@@ -30,7 +31,7 @@ public class BlueUp7 extends OpMode {
     public Follower follower;
     private int pathState = 0;
     private Paths paths;
-    private ShooterSubsystemRedUpAuto shooter;
+    private ShooterSubsystemTele shooter;
     private IntakeSubsystem intake;
     private ServoSubsystem servos;
     private BLTurret turret;
@@ -52,7 +53,7 @@ public class BlueUp7 extends OpMode {
         follower = Constants.createFollower(hardwareMap);
         follower.setStartingPose(new Pose(31, 131, Math.toRadians(90)));
 
-        shooter = new ShooterSubsystemRedUpAuto (hardwareMap);
+        shooter = new ShooterSubsystemTele(hardwareMap);
         intake = new IntakeSubsystem(hardwareMap);
         servos = new ServoSubsystem(hardwareMap);
 
