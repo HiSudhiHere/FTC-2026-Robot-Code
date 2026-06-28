@@ -11,6 +11,9 @@ public class ShooterSubsystem {
 
     // === TUNED FOR 10FT TARGET (UPDATED) ===
     private static final double FAST_VELOCITY = 1390; // Target updated to 1600
+
+    private static final double LONG_SHOOT= 1560; // Target updated to 1600
+
     private static final double SLOW_VELOCITY = 1240;//1260
     private static final double SHORT_VELOCITY = 1300;//1260
     private static final double SPINUP_BOOST_POWER = 1.0;
@@ -46,6 +49,9 @@ public class ShooterSubsystem {
         shootVelocity(FAST_VELOCITY);
     }
 
+    public void longShoot() {
+        shootVelocity(LONG_SHOOT);
+    }
     public void shootVERYSLOW() {
         shootVelocity(SHORT_VELOCITY);
     }

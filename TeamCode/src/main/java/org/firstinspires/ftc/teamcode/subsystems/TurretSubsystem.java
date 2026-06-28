@@ -145,6 +145,9 @@ public class TurretSubsystem {
     public void stop() {
         turret.setPower(0);
     }
+    public void setPower() {
+        turret.setPower(0.5);
+    }
 
     public int getPosition() {
         return turret.getCurrentPosition();

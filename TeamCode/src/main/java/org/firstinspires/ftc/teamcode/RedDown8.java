@@ -5,6 +5,9 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
+import com.qualcomm.hardware.limelightvision.LLResult;
+import com.qualcomm.hardware.limelightvision.Limelight3A;
+
 import com.bylazar.configurables.annotations.Configurable;
 import com.bylazar.telemetry.TelemetryManager;
 import com.bylazar.telemetry.PanelsTelemetry;
@@ -18,9 +21,9 @@ import com.pedropathing.geometry.Pose;
 
 import org.firstinspires.ftc.teamcode.subsystems.IntakeSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.ServoSubsystem;
-import org.firstinspires.ftc.teamcode.subsystems.ShooterSubsystemTele;
+import org.firstinspires.ftc.teamcode.subsystems.ShooterSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.TurretSubsystem;
-@Disabled
+
 @Autonomous(name = "RedDown8", group = "Autonomous")
 @Configurable
 public class RedDown8 extends OpMode {
@@ -29,7 +32,7 @@ public class RedDown8 extends OpMode {
     public Follower follower;
     private int pathState = 0;
     private Paths paths;
-    private ShooterSubsystemTele shooter;
+    private ShooterSubsystem shooter;
     private IntakeSubsystem intake;
     private ServoSubsystem servos;
     private TurretSubsystem turret;
@@ -37,12 +40,15 @@ public class RedDown8 extends OpMode {
 
     private static final double STOPPER_OPEN = 0.6;
     private static final double STOPPER_CLOSED = 0.3;
-    private static final double SHOOT_TIME = 600;
-    private static final double SHOOT_VELOCITY_READY = 1440;
+    private static final double SHOOT_TIME = 800;
+    private static final double SHOOT_VELOCITY_READY = 1490;
 
-    private static int value = 3;
+    private static int value = 5;
 
     private boolean shootingStarted = false;
+
+    private Limelight3A limelight;
+
 
     @Override
     public void init() {
@@ -51,22 +57,28 @@ public class RedDown8 extends OpMode {
         follower = Constants.createFollower(hardwareMap);
         follower.setStartingPose(new Pose(101, 8, Math.toRadians(0)));
 
-        shooter = new ShooterSubsystemTele(hardwareMap);
+        shooter = new ShooterSubsystem(hardwareMap);
         intake = new IntakeSubsystem(hardwareMap);
         servos = new ServoSubsystem(hardwareMap);
         turret = new TurretSubsystem(hardwareMap);
+        limelight = hardwareMap.get(Limelight3A.class, "limelight");
 
-        turret.setFieldAngle(0);
-        turret.setOffset(75);
+
+        turret.setFieldAngle(70);
 
         servos.setStopper(STOPPER_CLOSED);
-        servos.setHudder(0.55);
+        servos.setHudder(0.05);
 
         paths = new Paths(follower);
 
         panelsTelemetry.debug("Status", "Initialized");
         panelsTelemetry.update(telemetry);
-        follower.setMaxPower(0.95);
+        follower.setMaxPower(0.65);
+
+
+        limelight.pipelineSwitch(1);
+        limelight.start();
+
     }
 
     @Override
@@ -97,11 +109,13 @@ public class RedDown8 extends OpMode {
         panelsTelemetry.debug("Y", follower.getPose().getY());
         panelsTelemetry.debug("Heading", follower.getPose().getHeading());
         panelsTelemetry.update(telemetry);
+
+
     }
 
 
     private void startShootPath(PathChain path, int nextState) {
-        shooter.shootFast();
+        shooter.longShoot();
         servos.setStopper(STOPPER_CLOSED);
         intake.stop();
         shootingStarted = false;
@@ -111,7 +125,7 @@ public class RedDown8 extends OpMode {
     }
 
     private void runShootSequence(int nextState) {
-        shooter.shootFast();
+        shooter.longShoot();
 
         if (!shootingStarted) {
             servos.setStopper(STOPPER_CLOSED);
@@ -161,6 +175,7 @@ public class RedDown8 extends OpMode {
         switch (pathState) {
 
             case 0:
+                shooter.longShoot();
                 startShootPath(paths.shoot1, 1);
                 break;
 
@@ -172,175 +187,199 @@ public class RedDown8 extends OpMode {
                 break;
 
             case 2:
-                runShootSequence(3);
-                break;
+                shooter.longShoot();
 
-            case 3:
-                startNormalPath(paths.up1, 4);
-                break;
-
-            case 4:
-                if (!follower.isBusy()) {
-                    startIntakePath(paths.upIntake, 5);
-                }
-                break;
-
-            case 5:
-                if (!follower.isBusy()) {
+                if (!shootingStarted) {
+                    servos.setStopper(STOPPER_CLOSED);
                     intake.stop();
-                    startShootPath(paths.shoot2, 6);
+
+                    if (shooter.getAverageVelocity() > SHOOT_VELOCITY_READY) {
+                        shootingStarted = true;
+                        waitTimer.reset();
+                    }
+
+                    return;
                 }
-                break;
 
-            case 6:
-                if (!follower.isBusy()) {
-                    shootingStarted = false;
-                    pathState = 7;
-                }
-                break;
+                servos.setStopper(STOPPER_OPEN);
+                intake.intakeOut();
 
-            case 7:
-                runShootSequence(8);
-                break;
-
-            case 8:
-                startIntakePath(paths.down1, 9);
-                break;
-
-            case 9:
-                if (!follower.isBusy()) {
+                if (waitTimer.milliseconds() >= SHOOT_TIME+500) {
+                    servos.setStopper(STOPPER_CLOSED);
                     intake.stop();
-                    startShootPath(paths.shoot3, 10);
-                }
-                break;
+                    shooter.stop();
 
-            case 10:
-                if (!follower.isBusy()) {
                     shootingStarted = false;
-                    pathState = 11;
+                    pathState = 3;
                 }
                 break;
-
-            case 11:
-                runShootSequence(12);
-                break;
-
-            case 12:
-                startIntakePath(paths.down2, 13);
-                break;
-
-            case 13:
-                if (!follower.isBusy()) {
-                    intake.stop();
-                    startShootPath(paths.shoot4, 14);
-                }
-                break;
-
-            case 14:
-                if (!follower.isBusy()) {
-                    shootingStarted = false;
-                    pathState = 15;
-                }
-                break;
-
-            case 15:
-                runShootSequence(16);
-                break;
-
-            case 16:
-                startIntakePath(paths.down3, 17);
-                break;
-
-            case 17:
-                if (!follower.isBusy()) {
-                    intake.stop();
-                    startShootPath(paths.shoot5, 18);
-                }
-                break;
-
-            case 18:
-                if (!follower.isBusy()) {
-                    shootingStarted = false;
-                    pathState = 19;
-                }
-                break;
-
-            case 19:
-                runShootSequence(20);
-                break;
-
-            case 20:
-                startIntakePath(paths.down4, 21);
-                break;
-
-            case 21:
-                if (!follower.isBusy()) {
-                    intake.stop();
-                    startShootPath(paths.shoot6, 22);
-                }
-                break;
-
-            case 22:
-                if (!follower.isBusy()) {
-                    shootingStarted = false;
-                    pathState = 23;
-                }
-                break;
-
-            case 23:
-                runShootSequence(24);
-                break;
-
-            case 24:
-                startIntakePath(paths.up2, 25);
-                break;
-
-            case 25:
-                if (!follower.isBusy()) {
-                    intake.stop();
-                    startShootPath(paths.shoot7, 26);
-                }
-                break;
-
-            case 26:
-                if (!follower.isBusy()) {
-                    shootingStarted = false;
-                    pathState = 27;
-                }
-                break;
-
-            case 27:
-                runShootSequence(28);
-                break;
-
-            case 28:
-                startIntakePath(paths.down5, 29);
-                break;
-
-            case 29:
-                if (!follower.isBusy()) {
-                    intake.stop();
-                    startShootPath(paths.shoot8, 30);
-                }
-                break;
-
-            case 30:
-                if (!follower.isBusy()) {
-                    shootingStarted = false;
-                    pathState = 31;
-                }
-                break;
-
-            case 31:
-                runShootSequence(32);
-                break;
-
-            case 32:
-                intake.stop();
-                shooter.stop();
-                turret.stop();
-                servos.setStopper(STOPPER_CLOSED);
-                break;
+//
+//            case 3:
+//                startNormalPath(paths.up1, 4);
+//                break;
+//
+//            case 4:
+//                if (!follower.isBusy()) {
+//                    startIntakePath(paths.upIntake, 5);
+//                }
+//                break;
+//
+//            case 5:
+//                if (!follower.isBusy()) {
+//                    intake.stop();
+//                    startShootPath(paths.shoot2, 6);
+//                }
+//                break;
+//
+//            case 6:
+//                if (!follower.isBusy()) {
+//                    shootingStarted = false;
+//                    pathState = 7;
+//                }
+//                break;
+//
+//            case 7:
+//                runShootSequence(8);
+//                break;
+//
+//            case 8:
+//                startIntakePath(paths.down1, 9);
+//                break;
+//
+//            case 9:
+//                if (!follower.isBusy()) {
+//                    intake.stop();
+//                    startShootPath(paths.shoot3, 10);
+//                }
+//                break;
+//
+//            case 10:
+//                if (!follower.isBusy()) {
+//                    shootingStarted = false;
+//                    pathState = 11;
+//                }
+//                break;
+//
+//            case 11:
+//                runShootSequence(12);
+//                break;
+//
+//            case 12:
+//                startIntakePath(paths.down2, 13);
+//                break;
+//
+//            case 13:
+//                if (!follower.isBusy()) {
+//                    intake.stop();
+//                    startShootPath(paths.shoot4, 14);
+//                }
+//                break;
+//
+//            case 14:
+//                if (!follower.isBusy()) {
+//                    shootingStarted = false;
+//                    pathState = 15;
+//                }
+//                break;
+//
+//            case 15:
+//                runShootSequence(16);
+//                break;
+//
+//            case 16:
+//                startIntakePath(paths.down3, 17);
+//                break;
+//
+//            case 17:
+//                if (!follower.isBusy()) {
+//                    intake.stop();
+//                    startShootPath(paths.shoot5, 18);
+//                }
+//                break;
+//
+//            case 18:
+//                if (!follower.isBusy()) {
+//                    shootingStarted = false;
+//                    pathState = 19;
+//                }
+//                break;
+//
+//            case 19:
+//                runShootSequence(20);
+//                break;
+//
+//            case 20:
+//                startIntakePath(paths.down4, 21);
+//                break;
+//
+//            case 21:
+//                if (!follower.isBusy()) {
+//                    intake.stop();
+//                    startShootPath(paths.shoot6, 22);
+//                }
+//                break;
+//
+//            case 22:
+//                if (!follower.isBusy()) {
+//                    shootingStarted = false;
+//                    pathState = 23;
+//                }
+//                break;
+//
+//            case 23:
+//                runShootSequence(24);
+//                break;
+//
+//            case 24:
+//                startIntakePath(paths.up2, 25);
+//                break;
+//
+//            case 25:
+//                if (!follower.isBusy()) {
+//                    intake.stop();
+//                    startShootPath(paths.shoot7, 26);
+//                }
+//                break;
+//
+//            case 26:
+//                if (!follower.isBusy()) {
+//                    shootingStarted = false;
+//                    pathState = 27;
+//                }
+//                break;
+//
+//            case 27:
+//                runShootSequence(28);
+//                break;
+//
+//            case 28:
+//                startIntakePath(paths.down5, 29);
+//                break;
+//
+//            case 29:
+//                if (!follower.isBusy()) {
+//                    intake.stop();
+//                    startShootPath(paths.shoot8, 30);
+//                }
+//                break;
+//
+//            case 30:
+//                if (!follower.isBusy()) {
+//                    shootingStarted = false;
+//                    pathState = 31;
+//                }
+//                break;
+//
+//            case 31:
+//                runShootSequence(32);
+//                break;
+//
+//            case 32:
+//                intake.stop();
+//                shooter.stop();
+//                turret.stop();
+//                servos.setStopper(STOPPER_CLOSED);
+//                break;
         }
     }
 
@@ -482,4 +521,5 @@ public class RedDown8 extends OpMode {
                     .build();
         }
     }
+
 }
