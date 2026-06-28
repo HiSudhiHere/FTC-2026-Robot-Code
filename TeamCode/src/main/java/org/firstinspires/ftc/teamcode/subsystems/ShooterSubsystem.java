@@ -12,7 +12,7 @@ public class ShooterSubsystem {
     // === TUNED FOR 10FT TARGET (UPDATED) ===
     private static final double FAST_VELOCITY = 1390; // Target updated to 1600
 
-    private static final double LONG_SHOOT= 1560; // Target updated to 1600
+    private static final double LONG_SHOOT= 1450; // Target updated to 1500 from 1570
 
     private static final double SLOW_VELOCITY = 1240;//1260
     private static final double SHORT_VELOCITY = 1300;//1260
